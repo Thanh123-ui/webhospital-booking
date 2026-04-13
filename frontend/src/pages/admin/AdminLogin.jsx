@@ -32,7 +32,7 @@ const AdminLogin = () => {
         navigate('/admin/dashboard');
       }
     } catch (err) {
-      setError(err.response?.data?.message || 'Tài khoản hoặc mật khẩu không chính xác.');
+      setError(err.response?.data?.message || err.message || 'Lỗi kết nối đến máy chủ. Vui lòng kiểm tra Backend.');
     } finally {
       setLoading(false);
     }
@@ -63,15 +63,8 @@ const AdminLogin = () => {
           </p>
         </div>
 
-        <div className="relative z-10 space-y-3">
-          <div className="text-blue-300 text-xs font-bold uppercase tracking-widest mb-4">Phân quyền hệ thống</div>
-          {ROLE_INFO.map(r => (
-            <div key={r.role} className="flex items-center gap-3 bg-white/10 rounded-xl px-4 py-2.5">
-              <span className={`text-xs font-bold px-2.5 py-1 rounded-lg ${r.color}`}>{r.label}</span>
-            </div>
-          ))}
-        </div>
       </div>
+
 
       {/* Right panel - Login form */}
       <div className="flex-1 flex items-center justify-center bg-slate-50 p-8">

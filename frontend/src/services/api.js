@@ -1,6 +1,7 @@
 import axios from 'axios';
 
-const API_URL = 'http://localhost:5000/api';
+const SERVER_HOST = window.location.hostname;
+const API_URL = `http://${SERVER_HOST}:5000/api`;
 
 const apiClient = axios.create({
   baseURL: API_URL,
@@ -27,12 +28,15 @@ export const api = {
   completeMedicalRecord: (id, recordData) => apiClient.put(`/appointments/${id}/complete`, recordData),
   rescheduleAppointment: (id, data) => apiClient.put(`/appointments/${id}/reschedule`, data),
   cancelAppointment: (id, data) => apiClient.put(`/appointments/${id}/cancel`, data),
+  transferPatient: (id, data) => apiClient.put(`/appointments/${id}/transfer`, data),
+  getEmergencyTransfers: () => apiClient.get('/appointments/emergency-transfers'),
 
   getAllPatients: (role, deptId) => apiClient.get('/patients', { params: { role, deptId } }),
   registerPatient: (data) => apiClient.post('/patients/register', data),
 
-  getAllStaff: () => apiClient.get('/staff'),
+  getAllStaff: (role) => apiClient.get('/staff', { params: role ? { role } : {} }),
   addStaff: (data) => apiClient.post('/staff', data),
-  updateStaffRole: (id, role) => apiClient.put(`/staff/${id}/role`, { role }),
-  toggleStaffActive: (id) => apiClient.put(`/staff/${id}/toggle-active`)
+  updateStaffRole: (id, role, requesterRole) => apiClient.put(`/staff/${id}/role`, { role, requesterRole }),
+  toggleStaffActive: (id, requesterRole) => apiClient.put(`/staff/${id}/toggle-active`, { requesterRole }),
 };
+

@@ -40,7 +40,12 @@ const BookingWizard = () => {
   const currentHour = now.getHours();
   const currentMinute = now.getMinutes();
 
-  const availableDocs = doctors.filter(d => !bookingData.dept || d.deptId === parseInt(bookingData.dept));
+  const nonEmergencyDepts = departments.filter(d => !d.isEmergency);
+  const availableDocs = doctors.filter(d => {
+    const isEmergencyDoc = departments.find(dept => dept.id === d.deptId)?.isEmergency;
+    if (isEmergencyDoc) return false;
+    return !bookingData.dept || d.deptId === parseInt(bookingData.dept);
+  });
   const docSchedules = schedules.filter(s => s.doctorId === bookingData.doctorId && s.booked < s.maxPatients);
   
   const availableDates = [...new Set(docSchedules.map(s => s.date))].filter(d => d >= currentDateStr).sort();
@@ -99,7 +104,7 @@ const BookingWizard = () => {
                        <Activity size={28} className={bookingData.dept === '' ? "text-blue-600" : "text-slate-400"}/>
                        <span className="font-semibold text-sm text-center">Tất cả</span>
                     </button>
-                    {departments.map(d => (
+                    {nonEmergencyDepts.map(d => (
                       <button key={d.id} onClick={() => setBookingData({...bookingData, dept: d.id, doctorId: ''})} className={`p-4 border rounded-xl flex flex-col items-center justify-center gap-2 transition-all ${bookingData.dept === d.id ? 'bg-blue-50 border-blue-600 text-blue-700 shadow-sm ring-1 ring-blue-600' : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-600'}`}>
                         <Activity size={28} className={bookingData.dept === d.id ? "text-blue-600" : "text-slate-400"}/>
                         <span className="font-semibold text-sm text-center">{d.name}</span>

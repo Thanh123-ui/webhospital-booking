@@ -3,6 +3,7 @@ const mockDepartments = [
   { id: 2, name: 'Nhi khoa', desc: 'Chăm sóc sức khỏe toàn diện cho trẻ sơ sinh, trẻ nhỏ và vị thành niên.', iconRef: 'Activity', color: 'blue' },
   { id: 3, name: 'Nha khoa', desc: 'Khám, nhổ răng, phục hình thẩm mỹ và chăm sóc răng miệng.', iconRef: 'Stethoscope', color: 'teal' },
   { id: 4, name: 'Thần kinh', desc: 'Khám và điều trị các bệnh lý về não, tủy sống và dây thần kinh.', iconRef: 'Brain', color: 'purple' },
+  { id: 5, name: 'Cấp cứu', desc: 'Tiếp nhận và xử lý các trường hợp cấp cứu, chuyển viện và phân luồng khoa chuyên môn.', iconRef: 'Ambulance', color: 'orange', isEmergency: true },
 ];
 
 const mockDoctors = [
@@ -10,6 +11,7 @@ const mockDoctors = [
   { id: 2, deptId: 2, name: 'BS. Nguyễn Thị Bé', title: 'Thạc sĩ', avatar: '👩‍⚕️', exp: '10 năm', username: 'bsbe', password: 'bsbe@2024' },
   { id: 3, deptId: 3, name: 'BS. Lê Răng Sứ', title: 'BS Răng Hàm Mặt', avatar: '👨‍⚕️', exp: '8 năm', username: 'bssu', password: 'bssu@2024' },
   { id: 4, deptId: 4, name: 'BS. Phạm Não', title: 'PGS. TS. Bác sĩ', avatar: '👨‍⚕️', exp: '20 năm', username: 'bsnao', password: 'bsnao@2024' },
+  { id: 11, deptId: 5, name: 'BS. Lê Văn Cấp', title: 'BS Cấp cứu - Hồi sức tích cực', avatar: '🧑‍⚕️', exp: '12 năm', username: 'bscap', password: 'bscap@2024' },
 ];
 
 const initialStaff = [
@@ -24,7 +26,9 @@ const initialStaff = [
   { id: 8, deptId: null, name: 'Trần Thị Duyên', title: 'Trưởng bộ phận tiếp đón', avatar: '👩‍💼', role: 'RECEPTIONIST', isActive: true, username: 'reception', password: '123' },
   // Inactive
   { id: 9, deptId: 1, name: 'BS. Hoàng Đã Nghỉ', title: 'Bác sĩ cũ', avatar: '👨‍⚕️', role: 'DOCTOR', isActive: false, username: 'bsnghi', password: 'bsnghi@2024' },
-  { id: 10, deptId: 1, name: 'BS. Nguyễn Văn A', title: 'Bác sĩ chuyên khoa Tim Mạch', avatar: '👨‍⚕️', role: 'DOCTOR', isActive: true, username: 'nva', password: 'nva@2024' }
+  { id: 10, deptId: 1, name: 'BS. Nguyễn Văn A', title: 'Bác sĩ chuyên khoa Tim Mạch', avatar: '👨‍⚕️', role: 'DOCTOR', isActive: true, username: 'nva', password: 'nva@2024' },
+  // Khoa Cấp cứu
+  { id: 12, deptId: 5, name: 'ĐD. Phạm Thị Nhanh', title: 'Điều dưỡng Cấp cứu', avatar: '👩‍⚕️', role: 'NURSE', isActive: true, username: 'nursecap', password: 'nurse@2024' },
 ];
 
 const initialPatients = [
@@ -61,10 +65,27 @@ let schedules = generateMockSchedules();
 let staffList = [...initialStaff];
 let patientsList = [...initialPatients];
 let appointmentsList = [
-    { id: 1, code: 'BK-1001', patientId: 1, patientName: 'Nguyễn Văn A', phone: '0901234567', doctorId: 1, date: new Date().toISOString().split('T')[0], time: '08:00', status: 'PENDING', history: [] }
+    {
+        id: 1,
+        code: 'BK-1001',
+        patientId: 1,
+        patientName: 'Nguyễn Văn A',
+        phone: '0901234567',
+        doctorId: 1,
+        deptId: 1,
+        date: new Date().toISOString().split('T')[0],
+        time: '08:00',
+        status: 'PENDING',
+        is_emergency: false,
+        current_department: null,
+        history: []
+    }
 ];
 let logsList = [];
 let ratingsList = [];
+
+// Danh sách lịch sử chuyển hồ sơ cấp cứu
+let emergencyTransfers = [];
 
 module.exports = {
   mockDepartments,
@@ -74,5 +95,6 @@ module.exports = {
   patientsList,
   appointmentsList,
   logsList,
-  ratingsList
+  ratingsList,
+  emergencyTransfers
 };

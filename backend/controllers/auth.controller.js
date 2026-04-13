@@ -23,7 +23,8 @@ exports.patientLogin = (req, res) => {
 };
 
 exports.staffLogin = (req, res) => {
-    const { username, password } = req.body;
+    const username = (req.body.username || '').trim();
+    const password = (req.body.password || '').trim();
     const staff = db.staffList.find(s => s.username === username && s.password === password);
     if (!staff) {
         return res.status(401).json({ success: false, message: 'Tài khoản hoặc mật khẩu không chính xác.' });

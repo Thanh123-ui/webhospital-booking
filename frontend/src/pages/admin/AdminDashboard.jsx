@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Activity, Calendar, Users, Settings, LogOut, Stethoscope,
-  UserPlus, Check, ServerCrash, Bell, Shield, Eye, EyeOff
+  UserPlus, Check, ServerCrash, Bell, Shield, Eye, EyeOff,
+  AlertTriangle, ArrowRightLeft, X
 } from 'lucide-react';
 import { api } from '../../services/api';
 import { socket } from '../../services/socket';
@@ -11,21 +12,26 @@ import { getStatusBadge, getRoleConfig } from '../../utils/helpers';
 
 // ─── Permission Matrix ────────────────────────────────────────────────────────
 // ADMIN        : Full access
-// BOD          : Appointments + Patients + Staff view/toggle — NO logs, NO add/role
+// BOD          : Full access — chỉ KHÔNG được phân quyền user
 // DOCTOR       : Appointments + patients of own dept + exam
-// NURSE        : Appointments of own dept only — no medical records, no patients
+// NURSE        : Appointments của khoa mình — no medical records
 // RECEPTIONIST : Appointments only (view/confirm/arrived)
 // ─────────────────────────────────────────────────────────────────────────────
 const PERMS = {
-  canViewPatients:  (r) => r === 'ADMIN' || r === 'BOD' || r === 'DOCTOR',
-  canViewMedical:   (r) => r === 'ADMIN' || r === 'DOCTOR',
-  canViewStaff:     (r) => r === 'ADMIN' || r === 'BOD',
-  canAddStaff:      (r) => r === 'ADMIN',
-  canChangeRole:    (r) => r === 'ADMIN',
-  canToggleActive:  (r) => r === 'ADMIN' || r === 'BOD',
-  canViewLogs:      (r) => r === 'ADMIN',
+  canViewPatients:  (r) => ['ADMIN','BOD','DOCTOR'].includes(r),
+  canViewMedical:   (r) => ['ADMIN','BOD','DOCTOR'].includes(r),
+  canViewStaff:     (r) => ['ADMIN','BOD'].includes(r),
+  canAddStaff:      (r) => ['ADMIN','BOD'].includes(r),
+  canChangeRole:    (r) => r === 'ADMIN',           // BOD KHÔNG được phân quyền
+  canToggleActive:  (r) => ['ADMIN','BOD'].includes(r),
+  canViewLogs:      (r) => ['ADMIN','BOD'].includes(r),
   canExam:          (r) => r === 'DOCTOR',
   canUpdateStatus:  (r) => ['ADMIN','BOD','DOCTOR','NURSE','RECEPTIONIST'].includes(r),
+  canTransferEmergency: (r, deptId, departments) => {
+    if (!deptId || !departments) return false;
+    const dept = departments.find(d => d.id === deptId);
+    return r === 'DOCTOR' && dept?.isEmergency;
+  },
 };
 
 const AdminDashboard = () => {
@@ -33,7 +39,8 @@ const AdminDashboard = () => {
   const { currentStaffUser, setCurrentStaffUser } = useAuth();
   const role = currentStaffUser?.role;
 
-  // Which tabs are visible for this role
+  const [departments, setDepartments] = useState([]);
+
   const tabs = [
     { id: 'list',     label: 'Lịch hẹn & Khám',   icon: <Calendar size={17}/>,     show: true },
     { id: 'patients', label: 'Bệnh nhân',           icon: <Users size={17}/>,        show: PERMS.canViewPatients(role) },
@@ -45,20 +52,27 @@ const AdminDashboard = () => {
 
   const [appointments, setAppointments] = useState([]);
   const [patients, setPatients] = useState([]);
-  const [departments, setDepartments] = useState([]);
   const [staffList, setStaffList] = useState([]);
   const [logsList, setLogsList] = useState([]);
 
   const [newStaff, setNewStaff] = useState({ name: '', username: '', password: '', role: 'DOCTOR', title: '', deptId: '' });
   const [examModal, setExamModal] = useState(null);
   const [recordData, setRecordData] = useState({ diagnosis: '', prescription: '', notes: '' });
+  const [transferModal, setTransferModal] = useState(null); // { appt }
+  const [transferTargetDept, setTransferTargetDept] = useState('');
+  const [transferReason, setTransferReason] = useState('');
   const [toast, setToast] = useState(null);
+  const [toastType, setToastType] = useState('info'); // 'info' | 'emergency'
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedPatient, setSelectedPatient] = useState(null);
   const [patientDetailModal, setPatientDetailModal] = useState(false);
   const [showNewPass, setShowNewPass] = useState(false);
 
-  const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(null), 4000); };
+  const showToast = (msg, type = 'info') => {
+    setToast(msg);
+    setToastType(type);
+    setTimeout(() => setToast(null), 5000);
+  };
 
   const calcAge = (dob) => {
     if (!dob) return null;
@@ -71,9 +85,9 @@ const AdminDashboard = () => {
   };
 
   const fetchAppointments = () => api.getAllAppointments(currentStaffUser.role, currentStaffUser.deptId).then(res => setAppointments(res.data)).catch(console.error);
-  const fetchPatients = () => api.getAllPatients(currentStaffUser.role, currentStaffUser.deptId).then(res => setPatients(res.data)).catch(console.error);
-  const fetchStaff = () => api.getAllStaff().then(res => setStaffList(res.data)).catch(console.error);
-  const fetchLogs = () => api.getSystemLogs().then(res => setLogsList(res.data)).catch(console.error);
+  const fetchPatients    = () => api.getAllPatients(currentStaffUser.role, currentStaffUser.deptId).then(res => setPatients(res.data)).catch(console.error);
+  const fetchStaff       = () => api.getAllStaff(role === 'BOD' ? 'BOD' : undefined).then(res => setStaffList(res.data)).catch(console.error);
+  const fetchLogs        = () => api.getSystemLogs().then(res => setLogsList(res.data)).catch(console.error);
 
   useEffect(() => {
     if (!currentStaffUser) return;
@@ -85,14 +99,20 @@ const AdminDashboard = () => {
     if (PERMS.canViewLogs(role)) fetchLogs();
 
     const handleNewAppt = (appt) => {
-      showToast(`🔔 Lịch khám mới từ ${appt.patientName}!`);
+      showToast(`🔔 Lịch khám mới: ${appt.patientName} — ${appt.date} ${appt.time}`, 'info');
+      fetchAppointments();
+    };
+    const handleEmergencyTransfer = ({ transfer }) => {
+      showToast(`🚨 Chuyển khoa cấp cứu: ${transfer.patientName} → ${transfer.toDeptName}`, 'emergency');
       fetchAppointments();
     };
     socket.on('new_appointment', handleNewAppt);
     socket.on('update_appointment', fetchAppointments);
+    socket.on('emergency_transfer', handleEmergencyTransfer);
     return () => {
       socket.off('new_appointment', handleNewAppt);
       socket.off('update_appointment', fetchAppointments);
+      socket.off('emergency_transfer', handleEmergencyTransfer);
       socket.disconnect();
     };
   }, [currentStaffUser]);
@@ -125,20 +145,19 @@ const AdminDashboard = () => {
 
   const handleToggleStaff = async (id) => {
     try {
-      await api.toggleStaffActive(id);
+      await api.toggleStaffActive(id, role);
       fetchStaff();
-    } catch { alert('Lỗi khi thay đổi trạng thái!'); }
+    } catch (err) { alert(err.response?.data?.message || 'Lỗi khi thay đổi trạng thái!'); }
   };
 
   const handleChangeRole = async (id, newRole) => {
     if (!window.confirm(`Đổi vai trò sang "${newRole}"?`)) return;
     try {
-      await api.updateStaffRole(id, newRole);
+      await api.updateStaffRole(id, newRole, role);
       fetchStaff();
       showToast('✅ Đã cập nhật vai trò!');
-    } catch { alert('Lỗi khi đổi quyền!'); }
+    } catch (err) { alert(err.response?.data?.message || 'Lỗi khi đổi quyền!'); }
   };
-
 
   const handleCompleteExam = async (e) => {
     e.preventDefault();
@@ -152,19 +171,41 @@ const AdminDashboard = () => {
     } catch { alert('Lỗi khi lưu bệnh án!'); }
   };
 
+  const handleTransferPatient = async (e) => {
+    e.preventDefault();
+    if (!transferModal || !transferTargetDept) return;
+    try {
+      await api.transferPatient(transferModal.id, {
+        targetDeptId: transferTargetDept,
+        reason: transferReason,
+        transferredBy: currentStaffUser.id,
+        transferredByName: currentStaffUser.name,
+      });
+      setTransferModal(null);
+      setTransferTargetDept('');
+      setTransferReason('');
+      fetchAppointments();
+      const deptName = departments.find(d => d.id === parseInt(transferTargetDept))?.name;
+      showToast(`✅ Đã chuyển hồ sơ cấp cứu sang ${deptName}!`, 'emergency');
+    } catch (err) { alert(err.response?.data?.message || 'Lỗi khi chuyển khoa!'); }
+  };
+
   const logout = () => { setCurrentStaffUser(null); navigate('/admin'); };
 
   const roleConfig = getRoleConfig(role);
   const currentDept = departments.find(d => d.id === currentStaffUser?.deptId);
+  const isEmergencyDept = currentDept?.isEmergency;
 
   // Filter appointments for NURSE: only own dept
   const visibleAppointments = role === 'NURSE'
     ? appointments.filter(a => {
-        // find doctor's dept
         const docDept = a.deptId || null;
         return !currentStaffUser.deptId || docDept === currentStaffUser.deptId;
       })
     : appointments;
+
+  // Khoa cấp cứu không thể chuyển vào (để loại khỏi target)
+  const nonEmergencyDepts = departments.filter(d => !d.isEmergency);
 
   return (
     <div className="flex h-screen bg-[#F0F4FA] text-slate-800 font-['Inter',sans-serif]">
@@ -241,8 +282,13 @@ const AdminDashboard = () => {
               {new Date().toLocaleDateString('vi-VN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
             </p>
           </div>
-          <div className="flex items-center gap-4">
-            {role === 'NURSE' && (
+          <div className="flex items-center gap-3">
+            {isEmergencyDept && (
+              <div className="flex items-center gap-2 bg-red-50 text-red-700 px-3 py-1.5 rounded-lg text-xs font-bold border border-red-200 animate-pulse">
+                <AlertTriangle size={13}/> Khoa Cấp cứu
+              </div>
+            )}
+            {role === 'NURSE' && !isEmergencyDept && (
               <div className="flex items-center gap-2 bg-teal-50 text-teal-700 px-3 py-1.5 rounded-lg text-xs font-bold border border-teal-200">
                 <Shield size={13}/> Chế độ Điều dưỡng — {currentDept?.name}
               </div>
@@ -267,7 +313,7 @@ const AdminDashboard = () => {
             <div className="animate-in fade-in">
               <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                 <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center">
-                  <span className="font-bold text-slate-700">{appointments.length} lịch hẹn</span>
+                  <span className="font-bold text-slate-700">{visibleAppointments.length} lịch hẹn</span>
                   {role === 'NURSE' && (
                     <span className="text-xs bg-amber-50 text-amber-700 px-3 py-1.5 rounded-lg font-bold border border-amber-200">
                       ⚠ Chỉ hiển thị khoa {currentDept?.name}
@@ -286,16 +332,21 @@ const AdminDashboard = () => {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">
-                      {appointments.map(appt => (
+                      {visibleAppointments.map(appt => (
                         <tr
                           key={appt.id}
                           className={`transition hover:bg-slate-50 ${
-                            appt.status === 'EMERGENCY'
-                              ? 'bg-red-50 border-l-4 border-red-500 font-bold'
+                            appt.is_emergency || appt.status === 'EMERGENCY'
+                              ? 'bg-red-50 border-l-4 border-red-500'
+                              : appt.status === 'EMERGENCY_TRANSFER'
+                              ? 'bg-orange-50 border-l-4 border-orange-400'
                               : ''
                           }`}
                         >
-                          <td className="px-6 py-4 font-mono text-sm text-slate-500 font-semibold">{appt.code}</td>
+                          <td className="px-6 py-4 font-mono text-sm text-slate-500 font-semibold">
+                            {appt.code}
+                            {appt.is_emergency && <span className="ml-2 text-[10px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded font-bold">CC</span>}
+                          </td>
                           <td className="px-6 py-4">
                             <div className="font-bold text-slate-800">{appt.patientName}</div>
                             <div className="text-xs text-slate-400">{appt.phone}</div>
@@ -309,6 +360,7 @@ const AdminDashboard = () => {
                             <div className="flex items-center justify-end gap-2 flex-wrap">
                               {PERMS.canUpdateStatus(role) && (
                                 <>
+                                  {/* Thao tác theo flow chuẩn */}
                                   {appt.status === 'PENDING' && (
                                     <button onClick={() => handleUpdateStatus(appt.id, 'CONFIRMED')} className="text-xs bg-blue-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-blue-700 transition">
                                       Xác nhận
@@ -316,7 +368,7 @@ const AdminDashboard = () => {
                                   )}
                                   {appt.status === 'CONFIRMED' && (
                                     <button onClick={() => handleUpdateStatus(appt.id, 'ARRIVED')} className="text-xs bg-indigo-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-indigo-700 transition">
-                                      Đã đến
+                                      Đã đến viện
                                     </button>
                                   )}
                                   {appt.status === 'ARRIVED' && role !== 'RECEPTIONIST' && (
@@ -329,7 +381,34 @@ const AdminDashboard = () => {
                                       Khám ngay
                                     </button>
                                   )}
-                                  {(appt.status === 'PENDING' || appt.status === 'CONFIRMED') && (
+
+                                  {/* Cấp cứu: tiếp nhận và chuyển khoa */}
+                                  {(appt.is_emergency || appt.status === 'EMERGENCY') && role !== 'RECEPTIONIST' && (
+                                    <>
+                                      <button onClick={() => handleUpdateStatus(appt.id, 'ARRIVED')} className="text-xs bg-red-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-red-700 transition">
+                                        Tiếp nhận CC
+                                      </button>
+                                      {isEmergencyDept && (
+                                        <button
+                                          onClick={() => { setTransferModal(appt); setTransferTargetDept(''); setTransferReason(''); }}
+                                          className="text-xs bg-orange-500 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-orange-600 transition flex items-center gap-1"
+                                        >
+                                          <ArrowRightLeft size={12}/> Chuyển khoa
+                                        </button>
+                                      )}
+                                    </>
+                                  )}
+                                  {appt.status === 'EMERGENCY_TRANSFER' && isEmergencyDept && (
+                                    <button
+                                      onClick={() => { setTransferModal(appt); setTransferTargetDept(''); setTransferReason(''); }}
+                                      className="text-xs bg-orange-500 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-orange-600 transition flex items-center gap-1"
+                                    >
+                                      <ArrowRightLeft size={12}/> Chuyển lại
+                                    </button>
+                                  )}
+
+                                  {/* Hủy — chỉ PENDING */}
+                                  {appt.status === 'PENDING' && (
                                     <button onClick={() => handleCancelAppointment(appt.id)} className="text-xs text-red-600 border border-red-200 px-3 py-1.5 rounded-lg font-bold hover:bg-red-50 transition">
                                       Hủy
                                     </button>
@@ -340,7 +419,7 @@ const AdminDashboard = () => {
                           </td>
                         </tr>
                       ))}
-                      {appointments.length === 0 && (
+                      {visibleAppointments.length === 0 && (
                         <tr><td colSpan="5" className="px-6 py-12 text-center text-slate-400">
                           <Calendar size={32} className="mx-auto mb-3 opacity-30"/>
                           Chưa có lịch hẹn nào.
@@ -433,13 +512,18 @@ const AdminDashboard = () => {
           {activeTab === 'staff' && PERMS.canViewStaff(role) && (
             <div className="animate-in fade-in">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {/* Add form — ADMIN only */}
+                {/* Add form — ADMIN + BOD */}
                 {PERMS.canAddStaff(role) && (
                   <div className="md:col-span-1">
                     <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
                       <h3 className="font-bold text-base mb-5 flex items-center gap-2 pb-4 border-b border-slate-100">
                         <UserPlus size={18} className="text-blue-600" /> Thêm tài khoản mới
                       </h3>
+                      {role === 'BOD' && (
+                        <div className="mb-4 bg-amber-50 border border-amber-200 text-amber-800 rounded-xl px-4 py-2.5 text-xs font-semibold flex items-center gap-2">
+                          <Shield size={13}/> Ban Giám Đốc có thể thêm nhân sự nhưng không được phân quyền
+                        </div>
+                      )}
                       <form onSubmit={handleAddStaff} className="space-y-4">
                         <div>
                           <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">Họ và Tên</label>
@@ -455,12 +539,12 @@ const AdminDashboard = () => {
                             <option value="DOCTOR">Bác sĩ</option>
                             <option value="NURSE">Điều dưỡng</option>
                             <option value="RECEPTIONIST">Lễ tân</option>
-                            <option value="ADMIN">Admin IT</option>
+                            {role === 'ADMIN' && <option value="ADMIN">Admin IT</option>}
                           </select>
                         </div>
                         {(newStaff.role === 'DOCTOR' || newStaff.role === 'NURSE') && (
                           <div>
-                            <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">Chuyên khoa</label>
+                            <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">Chuyên khoa / Phòng ban</label>
                             <select required className="w-full p-3 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none" value={newStaff.deptId} onChange={e => setNewStaff({...newStaff, deptId: e.target.value})}>
                               <option value="">-- Chọn Khoa --</option>
                               {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
@@ -494,7 +578,7 @@ const AdminDashboard = () => {
                 <div className={PERMS.canAddStaff(role) ? 'md:col-span-2' : 'md:col-span-3'}>
                   {role === 'BOD' && (
                     <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-xl px-5 py-3 text-sm font-semibold mb-4 flex items-center gap-2">
-                      <Shield size={15}/> Chế độ Xem — Ban Giám Đốc không có quyền thêm/xóa tài khoản
+                      <Shield size={15}/> Bạn đang xem danh sách toàn bộ bác sĩ — Phân quyền tài khoản do Admin IT quản lý
                     </div>
                   )}
                   <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
@@ -506,7 +590,7 @@ const AdminDashboard = () => {
                             <th className="px-6 py-4 font-bold">Họ và Tên</th>
                             <th className="px-6 py-4 font-bold">Vai trò / Khoa</th>
                             <th className="px-6 py-4 font-bold">Trạng thái</th>
-                            {PERMS.canAddStaff(role) && <th className="px-6 py-4 font-bold text-right">Thao tác</th>}
+                            <th className="px-6 py-4 font-bold text-right">Thao tác</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-50">
@@ -516,7 +600,7 @@ const AdminDashboard = () => {
                               <tr key={staff.id} className={`transition hover:bg-slate-50 ${!staff.isActive ? 'opacity-50' : ''}`}>
                                 <td className="px-6 py-4">
                                   <div className="font-mono font-bold text-blue-700 text-sm">{staff.username}</div>
-                                  {PERMS.canAddStaff(role) && (
+                                  {role === 'ADMIN' && (
                                     <div className="flex items-center gap-1.5 mt-1.5">
                                       <span className="text-[10px] text-slate-400">Mật khẩu:</span>
                                       <span className="font-mono text-xs font-bold bg-slate-100 text-slate-700 px-2 py-0.5 rounded tracking-widest">{staff.password}</span>
@@ -539,20 +623,37 @@ const AdminDashboard = () => {
                                     : <span className="flex items-center gap-1.5 text-xs text-red-600 font-bold bg-red-50 px-2.5 py-1 rounded-lg w-fit border border-red-100">● Không hoạt động</span>
                                   }
                                 </td>
-                                {PERMS.canAddStaff(role) && (
-                                  <td className="px-6 py-4 text-right">
-                                    <button
-                                      onClick={() => handleToggleStaff(staff.id)}
-                                      className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition ${
-                                        staff.isActive
-                                          ? 'border-red-200 text-red-600 hover:bg-red-50'
-                                          : 'border-green-200 text-green-600 hover:bg-green-50'
-                                      }`}
-                                    >
-                                      {staff.isActive ? 'Vô hiệu hóa' : 'Kích hoạt'}
-                                    </button>
-                                  </td>
-                                )}
+                                <td className="px-6 py-4 text-right">
+                                  <div className="flex items-center justify-end gap-2">
+                                    {/* Kích hoạt/Vô hiệu — ADMIN + BOD */}
+                                    {PERMS.canToggleActive(role) && (
+                                      <button
+                                        onClick={() => handleToggleStaff(staff.id)}
+                                        className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition ${
+                                          staff.isActive
+                                            ? 'border-red-200 text-red-600 hover:bg-red-50'
+                                            : 'border-green-200 text-green-600 hover:bg-green-50'
+                                        }`}
+                                      >
+                                        {staff.isActive ? 'Vô hiệu hóa' : 'Kích hoạt'}
+                                      </button>
+                                    )}
+                                    {/* Phân quyền — CHỈ ADMIN */}
+                                    {PERMS.canChangeRole(role) && (
+                                      <select
+                                        value={staff.role}
+                                        onChange={e => handleChangeRole(staff.id, e.target.value)}
+                                        className="text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white focus:ring-2 focus:ring-blue-400 outline-none"
+                                      >
+                                        <option value="DOCTOR">Bác sĩ</option>
+                                        <option value="NURSE">Điều dưỡng</option>
+                                        <option value="RECEPTIONIST">Lễ tân</option>
+                                        <option value="ADMIN">Admin IT</option>
+                                        <option value="BOD">Ban Giám Đốc</option>
+                                      </select>
+                                    )}
+                                  </div>
+                                </td>
                               </tr>
                             );
                           })}
@@ -630,14 +731,69 @@ const AdminDashboard = () => {
                   value={recordData.prescription} onChange={e => setRecordData({...recordData, prescription: e.target.value})} placeholder="- Thuốc A: Ngày 2 viên...&#10;- Thuốc B: Uống sau ăn..."></textarea>
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">Lời dặn dò</label>
+                <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">Lời dặn dò / Tái khám</label>
                 <textarea rows="2" className="w-full p-3 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-green-500 resize-none text-sm"
-                  value={recordData.notes} onChange={e => setRecordData({...recordData, notes: e.target.value})} placeholder="Ăn uống, nghỉ ngơi..."></textarea>
+                  value={recordData.notes} onChange={e => setRecordData({...recordData, notes: e.target.value})} placeholder="Hẹn tái khám sau X ngày. Ăn uống, nghỉ ngơi..."></textarea>
               </div>
               <div className="flex justify-end gap-3 pt-2 border-t border-slate-100">
                 <button type="button" onClick={() => setExamModal(null)} className="px-5 py-2.5 rounded-xl font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition text-sm">Hủy bỏ</button>
                 <button type="submit" className="px-5 py-2.5 rounded-xl font-bold bg-green-600 text-white hover:bg-green-700 transition flex items-center gap-2 text-sm">
                   <Check size={16}/> Lưu & Đóng ca khám
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── TRANSFER MODAL (Cấp cứu chuyển khoa) ── */}
+      {transferModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden">
+            <div className="px-6 py-5 bg-gradient-to-r from-red-700 to-orange-600 text-white flex justify-between items-center">
+              <h2 className="text-lg font-black flex items-center gap-2">
+                <ArrowRightLeft size={22}/> Chuyển Khoa Cấp Cứu
+              </h2>
+              <button onClick={() => setTransferModal(null)} className="text-white/70 hover:text-white font-bold text-2xl leading-none">&times;</button>
+            </div>
+            <div className="px-6 py-4 bg-red-50 border-b border-red-100 text-sm">
+              <div className="font-bold text-red-800">🚨 Bệnh nhân: {transferModal.patientName}</div>
+              <div className="text-red-600 text-xs mt-1">Mã hồ sơ: {transferModal.code} — {transferModal.phone}</div>
+            </div>
+            <form onSubmit={handleTransferPatient} className="p-6 space-y-5">
+              <div className="bg-orange-50 border border-orange-200 rounded-xl px-4 py-3 text-xs text-orange-800 font-semibold">
+                ⚠️ Sau khi chuyển, hồ sơ sẽ được ưu tiên lên đầu danh sách chờ của khoa tiếp nhận và bác sĩ sẽ được thông báo realtime.
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">Khoa tiếp nhận <span className="text-red-500">*</span></label>
+                <select
+                  required
+                  className="w-full p-3 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-orange-500 outline-none"
+                  value={transferTargetDept}
+                  onChange={e => setTransferTargetDept(e.target.value)}
+                >
+                  <option value="">-- Chọn khoa chuyên môn --</option>
+                  {nonEmergencyDepts.map(d => (
+                    <option key={d.id} value={d.id}>{d.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">Lý do chuyển khoa</label>
+                <textarea
+                  rows="3"
+                  className="w-full p-3 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-orange-500 resize-none"
+                  value={transferReason}
+                  onChange={e => setTransferReason(e.target.value)}
+                  placeholder="VD: Bệnh nhân nhồi máu cơ tim cấp, cần can thiệp tim mạch khẩn..."
+                />
+              </div>
+              <div className="flex justify-end gap-3">
+                <button type="button" onClick={() => setTransferModal(null)} className="px-5 py-2.5 rounded-xl font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition text-sm">
+                  Hủy
+                </button>
+                <button type="submit" className="px-5 py-2.5 rounded-xl font-bold bg-red-600 text-white hover:bg-red-700 transition flex items-center gap-2 text-sm shadow">
+                  <ArrowRightLeft size={16}/> Xác nhận chuyển khoa
                 </button>
               </div>
             </form>
@@ -700,11 +856,18 @@ const AdminDashboard = () => {
         </div>
       )}
 
-      {/* ── TOAST ── */}
+      {/* ── TOAST (To hơn, có loại emergency) ── */}
       {toast && (
-        <div className="fixed bottom-6 right-6 bg-slate-900 text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 z-50 animate-in slide-in-from-bottom-4">
-          <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse shrink-0"></div>
-          <span className="font-semibold text-sm">{toast}</span>
+        <div className={`fixed bottom-6 right-6 px-7 py-5 rounded-2xl shadow-2xl flex items-center gap-4 z-50 animate-in slide-in-from-bottom-4 max-w-sm ${
+          toastType === 'emergency'
+            ? 'bg-red-700 text-white'
+            : 'bg-slate-900 text-white'
+        }`}>
+          <div className={`w-3 h-3 rounded-full shrink-0 animate-pulse ${toastType === 'emergency' ? 'bg-yellow-300' : 'bg-green-400'}`}></div>
+          <span className="font-bold text-base leading-snug">{toast}</span>
+          <button onClick={() => setToast(null)} className="ml-2 text-white/60 hover:text-white transition shrink-0">
+            <X size={16}/>
+          </button>
         </div>
       )}
     </div>

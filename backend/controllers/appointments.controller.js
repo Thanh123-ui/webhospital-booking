@@ -71,8 +71,8 @@ exports.getAppointmentByCode = (req, res) => {
 exports.createAppointment = (req, res) => {
     const data = req.body;
 
-    // ── POLICY 1: Chặn đặt lịch dưới 2 tiếng ──────────────────────────────
-    if (data.status !== 'EMERGENCY' && data.date && data.time) {
+    // ── POLICY 1: Chặn đặt lịch dưới 2 tiếng (bypass nếu is_emergency) ────
+    if (!data.is_emergency && data.status !== 'EMERGENCY' && data.date && data.time) {
         if (isTooSoon(data.date, data.time)) {
             return res.status(400).json({
                 message: 'Không thể đặt lịch cho khung giờ cách hiện tại dưới 2 tiếng. Vui lòng chọn khung giờ khác hoặc gọi hotline để đặt khẩn.'
@@ -80,8 +80,8 @@ exports.createAppointment = (req, res) => {
         }
     }
 
-    // ── POLICY 2: Kiểm tra trùng lịch (collision) ──────────────────────────
-    if (data.doctorId && data.date && data.time && data.status !== 'EMERGENCY') {
+    // ── POLICY 2: Kiểm tra trùng lịch (collision) — bypass nếu cấp cứu ────
+    if (!data.is_emergency && data.doctorId && data.date && data.time && data.status !== 'EMERGENCY') {
         if (checkCollision(data.doctorId, data.date, data.time)) {
             return res.status(409).json({
                 message: 'Khung giờ này đã có bệnh nhân khác đặt với cùng bác sĩ. Vui lòng chọn khung giờ hoặc bác sĩ khác.'
@@ -101,11 +101,13 @@ exports.createAppointment = (req, res) => {
         time: data.time,
         status: data.status || 'PENDING',
         symptoms: data.symptoms || '',
+        is_emergency: data.is_emergency || false,
+        current_department: data.current_department || null,
         vitals: null,
         history: [{
             date: new Date().toISOString(),
             action: 'Tạo lịch mới',
-            by: data.status === 'EMERGENCY' ? 'Hệ thống Cấp cứu' : 'Bệnh nhân'
+            by: data.is_emergency ? 'Hệ thống Cấp cứu' : (data.status === 'EMERGENCY' ? 'Hệ thống Cấp cứu' : 'Bệnh nhân')
         }]
     };
 
@@ -258,4 +260,92 @@ exports.cancelAppointment = (req, res) => {
     if (req.io) req.io.emit('update_appointment', db.appointmentsList[apptIndex]);
 
     res.json(db.appointmentsList[apptIndex]);
+};
+
+// ── TRANSFER PATIENT: Bác sĩ cấp cứu chuyển hồ sơ sang khoa chuyên môn ──────
+exports.transferPatient = (req, res) => {
+    const { id } = req.params;
+    const { targetDeptId, reason, transferredBy, transferredByName } = req.body;
+
+    if (!targetDeptId || !transferredBy) {
+        return res.status(400).json({ message: 'Thiếu thông tin khoa tiếp nhận hoặc người chuyển.' });
+    }
+
+    const apptIndex = db.appointmentsList.findIndex(a => a.id === parseInt(id));
+    if (apptIndex === -1) return res.status(404).json({ message: 'Không tìm thấy hồ sơ.' });
+
+    const appt = db.appointmentsList[apptIndex];
+
+    // Chỉ hồ sơ cấp cứu mới được chuyển khoa
+    if (!appt.is_emergency) {
+        return res.status(403).json({ message: 'Chỉ hồ sơ cấp cứu mới có thể chuyển khoa.' });
+    }
+
+    const targetDept = db.mockDepartments.find(d => d.id === parseInt(targetDeptId));
+    if (!targetDept) {
+        return res.status(404).json({ message: 'Khoa tiếp nhận không tồn tại.' });
+    }
+
+    const prevDeptId = appt.current_department;
+    const prevDeptName = prevDeptId
+        ? (db.mockDepartments.find(d => d.id === prevDeptId)?.name || 'Không rõ')
+        : 'Cấp cứu';
+
+    // Cập nhật hồ sơ
+    db.appointmentsList[apptIndex].current_department = parseInt(targetDeptId);
+    db.appointmentsList[apptIndex].deptId = parseInt(targetDeptId);
+    db.appointmentsList[apptIndex].status = 'EMERGENCY_TRANSFER';
+    db.appointmentsList[apptIndex].history.push({
+        date: new Date().toISOString(),
+        action: `Chuyển khoa: ${prevDeptName} → ${targetDept.name}. Lý do: ${reason || 'Không ghi rõ'}`,
+        by: transferredByName || `Staff #${transferredBy}`
+    });
+
+    // Log vào emergencyTransfers
+    const transferRecord = {
+        id: Date.now(),
+        appointmentId: appt.id,
+        appointmentCode: appt.code,
+        patientId: appt.patientId,
+        patientName: appt.patientName,
+        fromDeptId: prevDeptId,
+        fromDeptName: prevDeptName,
+        toDeptId: parseInt(targetDeptId),
+        toDeptName: targetDept.name,
+        reason: reason || '',
+        transferredBy: transferredBy,
+        transferredByName: transferredByName || '',
+        transferredAt: new Date().toISOString()
+    };
+    db.emergencyTransfers.push(transferRecord);
+
+    // Ưu tiên: đưa hồ sơ lên đầu danh sách chờ
+    const transferred = db.appointmentsList.splice(apptIndex, 1)[0];
+    db.appointmentsList.unshift(transferred);
+
+    writeLog(`Chuyển hồ sơ cấp cứu ${appt.code} (${appt.patientName}) → ${targetDept.name}`, transferredByName || 'System');
+
+    // Socket realtime: broadcast toàn bộ + emit riêng room khoa tiếp nhận
+    if (req.io) {
+        req.io.emit('emergency_transfer', {
+            transfer: transferRecord,
+            appointment: db.appointmentsList[0]
+        });
+        req.io.to(`dept_${targetDeptId}`).emit('emergency_transfer_dept', {
+            transfer: transferRecord,
+            appointment: db.appointmentsList[0],
+            alert: `⚠️ Hồ sơ cấp cứu ${appt.patientName} vừa được chuyển đến khoa bạn. Ưu tiên cao!`
+        });
+    }
+
+    res.json({
+        message: `Hồ sơ đã được chuyển thành công sang ${targetDept.name}`,
+        appointment: db.appointmentsList[0],
+        transfer: transferRecord
+    });
+};
+
+// Lấy lịch sử chuyển khoa cấp cứu
+exports.getEmergencyTransfers = (req, res) => {
+    res.json(db.emergencyTransfers);
 };
