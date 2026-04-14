@@ -43,3 +43,19 @@ exports.registerPatient = (req, res) => {
     db.patientsList.push(newPatient);
     res.status(201).json({ success: true, user: newPatient });
 };
+
+exports.updatePatient = (req, res) => {
+    const { id } = req.params;
+    const { cccd, dob, gender } = req.body;
+
+    const patientIndex = db.patientsList.findIndex(p => p.id === parseInt(id));
+    if (patientIndex === -1) {
+        return res.status(404).json({ success: false, message: 'Không tìm thấy bệnh nhân' });
+    }
+
+    if (cccd !== undefined) db.patientsList[patientIndex].cccd = cccd;
+    if (dob !== undefined) db.patientsList[patientIndex].dob = dob;
+    if (gender !== undefined) db.patientsList[patientIndex].gender = gender;
+
+    res.json({ success: true, user: db.patientsList[patientIndex] });
+};

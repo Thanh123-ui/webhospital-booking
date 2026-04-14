@@ -5,9 +5,9 @@ const db = require('../data/db');
 exports.getAllStaff = (req, res) => {
     const { role } = req.query;
 
-    // Ban Giám Đốc: chỉ thấy danh sách bác sĩ (DOCTOR), không thấy admin/system accounts
+    // Ban Giám Đốc: chỉ thấy danh sách bác sĩ (DOCTOR) đang chạy, không thấy admin/system accounts
     if (role === 'BOD') {
-        const doctors = db.staffList.filter(s => s.role === 'DOCTOR');
+        const doctors = db.staffList.filter(s => s.role === 'DOCTOR' && s.isActive === true);
         return res.json(doctors);
     }
 
@@ -72,6 +72,23 @@ exports.toggleStaffActive = (req, res) => {
     if (staff) {
         staff.isActive = !staff.isActive;
         res.json(staff);
+    } else {
+        res.status(404).json({ message: 'Not found' });
+    }
+};
+
+exports.updateStaffPassword = (req, res) => {
+    const { id } = req.params;
+    const { newPassword, requesterRole } = req.body;
+
+    if (requesterRole !== 'ADMIN') {
+        return res.status(403).json({ message: 'Chỉ Admin hệ thống mới có quyền Reset Mật khẩu.' });
+    }
+
+    const staff = db.staffList.find(s => s.id === parseInt(id));
+    if (staff) {
+        staff.password = newPassword;
+        res.json({ message: 'Đổi mật khẩu thành công.', staff });
     } else {
         res.status(404).json({ message: 'Not found' });
     }

@@ -9,7 +9,7 @@ const BookingWizard = () => {
   const [searchParams] = useSearchParams();
   const { currentPatient } = useAuth();
   const [step, setStep] = useState(1);
-  const [bookingData, setBookingData] = useState({ dept: '', doctorId: '', date: '', time: '', name: '', phone: '', email: '', dob: '', symptoms: '' });
+  const [bookingData, setBookingData] = useState({ dept: '', doctorId: '', date: '', time: '', name: '', phone: '', email: '', dob: '', cccd: '', gender: '', symptoms: '' });
   const [bookedCode, setBookedCode] = useState('');
   
   const [departments, setDepartments] = useState([]);
@@ -30,7 +30,13 @@ const BookingWizard = () => {
   useEffect(() => {
     if (currentPatient) {
       setBookingData(prev => ({ 
-        ...prev, name: currentPatient.name, phone: currentPatient.phone, email: currentPatient.email || '', dob: currentPatient.dob || ''
+        ...prev, 
+        name: currentPatient.name, 
+        phone: currentPatient.phone, 
+        email: currentPatient.email || '', 
+        dob: currentPatient.dob || '',
+        cccd: currentPatient.cccd || '',
+        gender: currentPatient.gender || ''
       }));
     }
   }, [currentPatient]);
@@ -63,7 +69,16 @@ const BookingWizard = () => {
     e.preventDefault();
     try {
       const payload = {
-        name: bookingData.name, phone: bookingData.phone, doctorId: bookingData.doctorId, date: bookingData.date, time: bookingData.time, symptoms: bookingData.symptoms, patientId: currentPatient ? currentPatient.id : null
+        name: bookingData.name, 
+        phone: bookingData.phone, 
+        cccd: bookingData.cccd,
+        dob: bookingData.dob,
+        gender: bookingData.gender,
+        doctorId: bookingData.doctorId, 
+        date: bookingData.date, 
+        time: bookingData.time, 
+        symptoms: bookingData.symptoms, 
+        patientId: currentPatient ? currentPatient.id : null
       };
       const res = await api.createAppointment(payload);
       setBookedCode(res.data.code);
@@ -229,6 +244,26 @@ const BookingWizard = () => {
                       <label className="block text-sm font-bold text-slate-700 mb-1">Số điện thoại <span className="text-red-500">*</span></label>
                       <input required type="tel" className={`w-full p-3 border rounded-xl outline-none transition-all ${currentPatient ? 'bg-slate-100 text-slate-500 border-slate-200' : 'bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500'}`}
                         value={bookingData.phone} onChange={e => setBookingData({...bookingData, phone: e.target.value})} placeholder="VD: 0901234567" readOnly={!!currentPatient} />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-bold text-slate-700 mb-1">Số Căn cước công dân <span className="text-red-500">*</span></label>
+                      <input required type="number" className={`w-full p-3 border rounded-xl outline-none transition-all ${currentPatient && currentPatient.cccd ? 'bg-slate-100 text-slate-500 border-slate-200' : 'bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500'}`}
+                        value={bookingData.cccd} onChange={e => setBookingData({...bookingData, cccd: e.target.value})} placeholder="VD: 079012345678" readOnly={!!(currentPatient && currentPatient.cccd)} />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-bold text-slate-700 mb-1">Giới tính <span className="text-red-500">*</span></label>
+                      <select required className={`w-full p-3 border rounded-xl outline-none transition-all ${currentPatient && currentPatient.gender ? 'bg-slate-100 text-slate-500 border-slate-200' : 'bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500'}`}
+                        value={bookingData.gender} onChange={e => setBookingData({...bookingData, gender: e.target.value})} disabled={!!(currentPatient && currentPatient.gender)}>
+                        <option value="">-- Chọn giới tính --</option>
+                        <option value="Nam">Nam</option>
+                        <option value="Nữ">Nữ</option>
+                        <option value="Khác">Khác</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-bold text-slate-700 mb-1">Ngày sinh <span className="text-red-500">*</span></label>
+                      <input required type="date" className={`w-full p-3 border rounded-xl outline-none transition-all ${currentPatient && currentPatient.dob ? 'bg-slate-100 text-slate-500 border-slate-200' : 'bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500'}`}
+                        value={bookingData.dob} onChange={e => setBookingData({...bookingData, dob: e.target.value})} readOnly={!!(currentPatient && currentPatient.dob)} />
                     </div>
                     <div className="md:col-span-2">
                       <label className="block text-sm font-bold text-slate-700 mb-1">Triệu chứng / Ghi chú cho bác sĩ</label>

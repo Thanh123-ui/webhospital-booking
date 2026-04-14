@@ -5,13 +5,32 @@ import { api } from '../../services/api';
 import { getStatusBadge } from '../../utils/helpers';
 
 const PatientProfile = () => {
-  const { currentPatient } = useAuth();
+  const { currentPatient, setCurrentPatient } = useAuth();
   const [appointments, setAppointments] = useState([]);
   const [printData, setPrintData] = useState(null);
   
   const [ratingModal, setRatingModal] = useState(null);
   const [ratingVal, setRatingVal] = useState(5);
   const [ratingComment, setRatingComment] = useState('');
+
+  const [editProfileModal, setEditProfileModal] = useState(false);
+  const [profileData, setProfileData] = useState({ cccd: '', dob: '', gender: '' });
+
+  const handleOpenEdit = () => {
+    setProfileData({ cccd: currentPatient.cccd || '', dob: currentPatient.dob || '', gender: currentPatient.gender || '' });
+    setEditProfileModal(true);
+  };
+
+  const handleUpdateProfile = async (e) => {
+    e.preventDefault();
+    try {
+       const res = await api.updatePatientProfile(currentPatient.id, profileData);
+       setCurrentPatient(res.data.user);
+       setEditProfileModal(false);
+    } catch(err) {
+       alert("Lỗi cập nhật thông tin.");
+    }
+  };
 
   const fetchAppts = () => {
     if (currentPatient) {
@@ -66,11 +85,13 @@ const PatientProfile = () => {
             <h2 className="text-xl font-bold text-center text-slate-800 mb-1">{currentPatient.name}</h2>
             <p className="text-center text-slate-500 text-sm mb-6 pb-6 border-b">{currentPatient.phone}</p>
             
-            <div className="space-y-4 text-sm">
+            <div className="space-y-4 text-sm mb-6">
               <div className="flex justify-between items-center"><span className="text-slate-500">Ngày sinh:</span> <span className="font-semibold text-slate-700">{currentPatient.dob || '---'}</span></div>
               <div className="flex justify-between items-center"><span className="text-slate-500">Giới tính:</span> <span className="font-semibold text-slate-700">{currentPatient.gender || '---'}</span></div>
+              <div className="flex justify-between items-center"><span className="text-slate-500">CCCD:</span> <span className="font-semibold text-slate-700">{currentPatient.cccd || '---'}</span></div>
               <div className="flex justify-between items-center"><span className="text-slate-500">Email:</span> <span className="font-semibold text-slate-700 break-all">{currentPatient.email || '---'}</span></div>
             </div>
+            <button onClick={handleOpenEdit} className="w-full py-2.5 bg-slate-100 hover:bg-blue-50 hover:text-blue-600 text-slate-600 font-bold rounded-xl transition">Chỉnh sửa hồ sơ</button>
           </div>
         </div>
 
@@ -220,6 +241,38 @@ const PatientProfile = () => {
               <div className="flex gap-3">
                  <button type="button" onClick={()=>setRatingModal(null)} className="flex-1 py-3 rounded-xl font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition">Bỏ qua</button>
                  <button type="submit" className="flex-1 py-3 rounded-xl font-bold bg-blue-600 text-white hover:bg-blue-700 transition">Gửi Đánh giá</button>
+              </div>
+           </form>
+        </div>
+      )}
+
+      {/* Edit Profile Modal */}
+      {editProfileModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+           <form onSubmit={handleUpdateProfile} className="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden flex flex-col p-6 animate-in zoom-in-95">
+              <h3 className="text-xl font-bold text-slate-800 mb-6 text-center border-b pb-4">Cập nhật Hồ Sơ</h3>
+              <div className="space-y-4 mb-6">
+                 <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Căn cước công dân <span className="text-red-500">*</span></label>
+                    <input required type="number" className="w-full p-2.5 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500" value={profileData.cccd} onChange={e=>setProfileData({...profileData, cccd: e.target.value})} />
+                 </div>
+                 <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Giới tính <span className="text-red-500">*</span></label>
+                    <select required className="w-full p-2.5 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500" value={profileData.gender} onChange={e=>setProfileData({...profileData, gender: e.target.value})}>
+                       <option value="">- Chọn -</option>
+                       <option value="Nam">Nam</option>
+                       <option value="Nữ">Nữ</option>
+                       <option value="Khác">Khác</option>
+                    </select>
+                 </div>
+                 <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Ngày sinh <span className="text-red-500">*</span></label>
+                    <input required type="date" className="w-full p-2.5 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500" value={profileData.dob} onChange={e=>setProfileData({...profileData, dob: e.target.value})} />
+                 </div>
+              </div>
+              <div className="flex gap-3">
+                 <button type="button" onClick={()=>setEditProfileModal(false)} className="flex-1 py-3 rounded-xl font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition">Hủy</button>
+                 <button type="submit" className="flex-1 py-3 rounded-xl font-bold bg-blue-600 text-white hover:bg-blue-700 transition">Lưu thay đổi</button>
               </div>
            </form>
         </div>

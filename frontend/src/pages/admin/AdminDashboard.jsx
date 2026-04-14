@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   Activity, Calendar, Users, Settings, LogOut, Stethoscope,
   UserPlus, Check, ServerCrash, Bell, Shield, Eye, EyeOff,
-  AlertTriangle, ArrowRightLeft, X
+  AlertTriangle, ArrowRightLeft, X, Key, Search
 } from 'lucide-react';
 import { api } from '../../services/api';
 import { socket } from '../../services/socket';
@@ -21,10 +21,10 @@ const PERMS = {
   canViewPatients:  (r) => ['ADMIN','BOD','DOCTOR'].includes(r),
   canViewMedical:   (r) => ['ADMIN','BOD','DOCTOR'].includes(r),
   canViewStaff:     (r) => ['ADMIN','BOD'].includes(r),
-  canAddStaff:      (r) => ['ADMIN','BOD'].includes(r),
+  canAddStaff:      (r) => ['ADMIN'].includes(r),
   canChangeRole:    (r) => r === 'ADMIN',           // BOD KHÔNG được phân quyền
   canToggleActive:  (r) => ['ADMIN','BOD'].includes(r),
-  canViewLogs:      (r) => ['ADMIN','BOD'].includes(r),
+  canViewLogs:      (r) => ['ADMIN'].includes(r),
   canExam:          (r) => r === 'DOCTOR',
   canUpdateStatus:  (r) => ['ADMIN','BOD','DOCTOR','NURSE','RECEPTIONIST'].includes(r),
   canTransferEmergency: (r, deptId, departments) => {
@@ -67,6 +67,15 @@ const AdminDashboard = () => {
   const [selectedPatient, setSelectedPatient] = useState(null);
   const [patientDetailModal, setPatientDetailModal] = useState(false);
   const [showNewPass, setShowNewPass] = useState(false);
+
+  // New features state
+  const [staffSearchQuery, setStaffSearchQuery] = useState('');
+  const [resetPassModal, setResetPassModal] = useState(null);
+  const [resetPassValue, setResetPassValue] = useState('');
+  
+  const [apptDateFilter, setApptDateFilter] = useState('');
+  const [apptTimeFilter, setApptTimeFilter] = useState('');
+  const [apptDeptFilter, setApptDeptFilter] = useState('');
 
   const showToast = (msg, type = 'info') => {
     setToast(msg);
@@ -159,6 +168,17 @@ const AdminDashboard = () => {
     } catch (err) { alert(err.response?.data?.message || 'Lỗi khi đổi quyền!'); }
   };
 
+  const handleResetPassword = async (e) => {
+    e.preventDefault();
+    if (resetPassValue.length < 3) return alert('Mật khẩu quá ngắn');
+    try {
+      await api.resetStaffPassword(resetPassModal, resetPassValue, role);
+      showToast('✅ Đã cấp lại mật khẩu thành công!');
+      setResetPassModal(null);
+      setResetPassValue('');
+    } catch (err) { alert(err.response?.data?.message || 'Lỗi reset pass!'); }
+  };
+
   const handleCompleteExam = async (e) => {
     e.preventDefault();
     if (!examModal) return;
@@ -197,72 +217,98 @@ const AdminDashboard = () => {
   const isEmergencyDept = currentDept?.isEmergency;
 
   // Filter appointments for NURSE: only own dept
-  const visibleAppointments = role === 'NURSE'
+  let visibleAppointments = role === 'NURSE'
     ? appointments.filter(a => {
         const docDept = a.deptId || null;
         return !currentStaffUser.deptId || docDept === currentStaffUser.deptId;
       })
     : appointments;
 
+  if (apptDateFilter) visibleAppointments = visibleAppointments.filter(a => a.date === apptDateFilter);
+  if (apptTimeFilter) visibleAppointments = visibleAppointments.filter(a => a.time === apptTimeFilter);
+  if (apptDeptFilter) visibleAppointments = visibleAppointments.filter(a => a.deptId === parseInt(apptDeptFilter));
+
+  const stats = {
+    total: visibleAppointments.length,
+    waiting: visibleAppointments.filter(a => ['READY', 'ARRIVED', 'TRANSFER_PENDING'].includes(a.status)).length,
+    done: visibleAppointments.filter(a => a.status === 'DONE').length,
+    emergency: visibleAppointments.filter(a => a.is_emergency).length
+  };
+
+  const visibleStaff = staffList.filter(s => 
+    s.name.toLowerCase().includes(staffSearchQuery.toLowerCase()) || 
+    s.username.toLowerCase().includes(staffSearchQuery.toLowerCase())
+  );
+
   // Khoa cấp cứu không thể chuyển vào (để loại khỏi target)
-  const nonEmergencyDepts = departments.filter(d => !d.isEmergency);
+  // const nonEmergencyDepts = departments.filter(d => !d.isEmergency);
 
   return (
-    <div className="flex h-screen bg-[#F0F4FA] text-slate-800 font-['Inter',sans-serif]">
+    <div className="flex h-screen text-slate-800 font-['Inter',sans-serif]" style={{background:'#f0f4fa'}}>
 
       {/* ── SIDEBAR ── */}
-      <aside className="w-64 bg-blue-950 text-slate-300 flex flex-col shadow-2xl shrink-0">
+      <aside className="w-64 flex flex-col shrink-0 shadow-2xl" style={{background:'linear-gradient(180deg,#0f1f3d 0%,#0d1b35 60%,#0a1628 100%)'}}>
         {/* Logo */}
-        <div className="px-5 py-5 border-b border-blue-900 flex items-center gap-3">
-          <div className="w-9 h-9 bg-blue-600 rounded-xl flex items-center justify-center shrink-0 shadow">
-            <span className="text-white font-black text-base">+</span>
+        <div className="px-5 py-5 flex items-center gap-3" style={{borderBottom:'1px solid rgba(255,255,255,0.07)'}}>
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 shadow-lg" style={{background:'linear-gradient(135deg,#2563eb,#0ea5e9)'}}>
+            <span className="text-white font-black text-lg">+</span>
           </div>
           <div>
             <div className="text-white font-black text-sm tracking-widest">HOSPITAL</div>
-            <div className="text-blue-400 text-[10px] font-semibold tracking-wider">Cổng Nội Bộ</div>
+            <div className="text-sky-400 text-[10px] font-semibold tracking-widest uppercase">Nội Bộ</div>
           </div>
         </div>
 
         {/* User info */}
-        <div className="px-4 py-4 border-b border-blue-900/60">
-          <div className="flex items-center gap-3 bg-blue-900/50 rounded-2xl px-3 py-3">
-            <div className="w-10 h-10 rounded-xl bg-blue-700 flex items-center justify-center text-xl shrink-0">
+        <div className="px-4 py-4" style={{borderBottom:'1px solid rgba(255,255,255,0.06)'}}>
+          <div className="flex items-center gap-3 rounded-2xl px-3 py-3" style={{background:'rgba(255,255,255,0.06)'}}>
+            <div className="w-11 h-11 rounded-xl flex items-center justify-center text-xl shrink-0 shadow" style={{background:'linear-gradient(135deg,#1e40af,#2563eb)'}}>
               {currentStaffUser?.avatar || '👤'}
             </div>
             <div className="min-w-0">
               <div className="text-white font-bold text-sm leading-tight truncate">{currentStaffUser?.name}</div>
-              <div className="mt-1">
-                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${roleConfig.bg} ${roleConfig.text}`}>
+              <div className="mt-1.5">
+                <span className={`text-[10px] font-bold px-2.5 py-1 rounded-lg ${roleConfig.bg} ${roleConfig.text}`}>
                   {roleConfig.label}
                 </span>
               </div>
-              {currentDept && <div className="text-[10px] text-blue-300 mt-1 font-medium truncate">{currentDept.name}</div>}
+              {currentDept && <div className="text-[10px] text-sky-400 mt-1.5 font-semibold truncate">📍 {currentDept.name}</div>}
             </div>
           </div>
         </div>
 
+        {/* Nav label */}
+        <div className="px-5 pt-5 pb-2">
+          <span className="text-[9px] font-black uppercase tracking-widest" style={{color:'rgba(148,163,184,0.5)'}}>Menu chính</span>
+        </div>
+
         {/* Nav */}
-        <nav className="flex-1 py-3 px-3 space-y-1 overflow-y-auto">
+        <nav className="flex-1 px-3 space-y-1 overflow-y-auto pb-3">
           {tabs.map(tab => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all relative ${
                 activeTab === tab.id
-                  ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/40'
-                  : 'text-slate-400 hover:text-white hover:bg-blue-900/60'
+                  ? 'text-white shadow-lg'
+                  : 'text-slate-500 hover:text-white'
               }`}
+              style={activeTab === tab.id ? {background:'linear-gradient(90deg,#2563eb,#1d4ed8)'} : {background:'transparent'}}
             >
+              {activeTab === tab.id && <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-sky-400 rounded-r-full"/>}
               {tab.icon} {tab.label}
             </button>
           ))}
         </nav>
 
         {/* Logout */}
-        <div className="p-3 border-t border-blue-900">
+        <div className="p-3" style={{borderTop:'1px solid rgba(255,255,255,0.06)'}}>
           <button
             onClick={logout}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold text-red-400 hover:text-red-300 hover:bg-red-950/40 transition-all"
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all"
+            style={{color:'#f87171'}}
+            onMouseEnter={e=>e.currentTarget.style.background='rgba(239,68,68,0.1)'}
+            onMouseLeave={e=>e.currentTarget.style.background='transparent'}
           >
             <LogOut size={17} /> Đăng xuất
           </button>
@@ -270,37 +316,63 @@ const AdminDashboard = () => {
       </aside>
 
       {/* ── MAIN ── */}
-      <main className="flex-1 overflow-auto">
+      <main className="flex-1 overflow-auto bg-slate-50">
         {/* Top bar */}
-        <div className="bg-white border-b border-slate-200 px-8 py-4 flex justify-between items-center sticky top-0 z-20 shadow-sm">
-          <div>
-            <h1 className="text-lg font-black text-slate-800">
-              {tabs.find(t => t.id === activeTab)?.label}
-              {currentDept && activeTab === 'list' && <span className="text-blue-600 ml-2">— {currentDept.name}</span>}
-            </h1>
-            <p className="text-xs text-slate-400 mt-0.5">
-              {new Date().toLocaleDateString('vi-VN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-            </p>
+        <div className="bg-white border-b border-slate-100 px-8 py-4 flex justify-between items-center sticky top-0 z-20" style={{boxShadow:'0 1px 12px rgba(0,0,0,0.06)'}}>
+          <div className="flex items-center gap-4">
+            <div>
+              <h1 className="text-lg font-black text-slate-800 flex items-center gap-2">
+                {tabs.find(t => t.id === activeTab)?.label}
+                {currentDept && activeTab === 'list' && (
+                  <span className="text-xs font-bold px-2.5 py-1 bg-blue-50 text-blue-600 rounded-lg border border-blue-100">{currentDept.name}</span>
+                )}
+              </h1>
+              <p className="text-xs text-slate-400 mt-0.5 flex items-center gap-1">
+                <span>🗓</span> {new Date().toLocaleDateString('vi-VN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+              </p>
+            </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             {isEmergencyDept && (
-              <div className="flex items-center gap-2 bg-red-50 text-red-700 px-3 py-1.5 rounded-lg text-xs font-bold border border-red-200 animate-pulse">
-                <AlertTriangle size={13}/> Khoa Cấp cứu
+              <div className="flex items-center gap-2 bg-red-600 text-white px-3 py-2 rounded-xl text-xs font-bold shadow-lg shadow-red-200 animate-pulse">
+                <AlertTriangle size={13}/> 🚨 Khoa Cấp cứu
               </div>
             )}
             {role === 'NURSE' && !isEmergencyDept && (
-              <div className="flex items-center gap-2 bg-teal-50 text-teal-700 px-3 py-1.5 rounded-lg text-xs font-bold border border-teal-200">
-                <Shield size={13}/> Chế độ Điều dưỡng — {currentDept?.name}
+              <div className="flex items-center gap-2 bg-teal-500 text-white px-3 py-2 rounded-xl text-xs font-bold shadow-sm">
+                <Shield size={13}/> Điều dưỡng · {currentDept?.name}
               </div>
             )}
             {role === 'RECEPTIONIST' && (
-              <div className="flex items-center gap-2 bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-lg text-xs font-bold border border-indigo-200">
-                <Shield size={13}/> Chế độ Lễ tân
+              <div className="flex items-center gap-2 bg-indigo-500 text-white px-3 py-2 rounded-xl text-xs font-bold shadow-sm">
+                <Shield size={13}/> Lễ tân
               </div>
             )}
             {role === 'BOD' && (
-              <div className="flex items-center gap-2 bg-amber-50 text-amber-700 px-3 py-1.5 rounded-lg text-xs font-bold border border-amber-200">
+              <div className="flex items-center gap-2 bg-amber-500 text-white px-3 py-2 rounded-xl text-xs font-bold shadow-sm">
                 <Shield size={13}/> Ban Giám Đốc
+              </div>
+            )}
+            {activeTab === 'list' && (
+              <div className="flex items-center gap-2 ml-2 pl-2 border-l border-slate-100">
+                <div className="text-center px-3 py-1.5 bg-slate-50 rounded-xl border border-slate-100">
+                  <div className="text-lg font-black text-slate-700">{stats.total}</div>
+                  <div className="text-[9px] font-bold text-slate-400 uppercase">Tổng</div>
+                </div>
+                <div className="text-center px-3 py-1.5 bg-orange-50 rounded-xl border border-orange-100">
+                  <div className="text-lg font-black text-orange-600">{stats.waiting}</div>
+                  <div className="text-[9px] font-bold text-orange-400 uppercase">Chờ</div>
+                </div>
+                <div className="text-center px-3 py-1.5 bg-green-50 rounded-xl border border-green-100">
+                  <div className="text-lg font-black text-green-600">{stats.done}</div>
+                  <div className="text-[9px] font-bold text-green-400 uppercase">Xong</div>
+                </div>
+                {stats.emergency > 0 && (
+                  <div className="text-center px-3 py-1.5 bg-red-50 rounded-xl border border-red-100 animate-pulse">
+                    <div className="text-lg font-black text-red-600">{stats.emergency}</div>
+                    <div className="text-[9px] font-bold text-red-400 uppercase">CC</div>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -312,13 +384,26 @@ const AdminDashboard = () => {
           {activeTab === 'list' && (
             <div className="animate-in fade-in">
               <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center">
-                  <span className="font-bold text-slate-700">{visibleAppointments.length} lịch hẹn</span>
-                  {role === 'NURSE' && (
-                    <span className="text-xs bg-amber-50 text-amber-700 px-3 py-1.5 rounded-lg font-bold border border-amber-200">
-                      ⚠ Chỉ hiển thị khoa {currentDept?.name}
-                    </span>
-                  )}
+                <div className="px-6 py-4 border-b border-slate-100 flex flex-col md:flex-row justify-between items-center bg-slate-50 gap-4">
+                  <div className="flex items-center gap-3">
+                    <span className="font-bold text-slate-700 bg-white px-3 py-1.5 border rounded-lg shadow-sm">Thống kê: {stats.total} ca</span>
+                    <span className="text-xs font-semibold text-orange-600 bg-orange-50 px-2 py-1 rounded-md border border-orange-200">{stats.waiting} Đang chờ</span>
+                    <span className="text-xs font-semibold text-green-600 bg-green-50 px-2 py-1 rounded-md border border-green-200">{stats.done} Đã khám xong</span>
+                  </div>
+                  
+                  <div className="flex flex-wrap items-center gap-3">
+                    <input type="date" className="text-xs p-2 border rounded-lg outline-none text-slate-600" value={apptDateFilter} onChange={e=>setApptDateFilter(e.target.value)} />
+                    <select className="text-xs p-2 border rounded-lg outline-none text-slate-600" value={apptTimeFilter} onChange={e=>setApptTimeFilter(e.target.value)}>
+                      <option value="">Lọc theo Giờ</option>
+                      {['08:00', '09:00', '10:00', '14:00', '15:00', '16:00', '18:00', '20:00'].map(t=><option key={t} value={t}>{t}</option>)}
+                    </select>
+                    {!currentDept && (
+                      <select className="text-xs p-2 border rounded-lg outline-none text-slate-600 max-w-[120px]" value={apptDeptFilter} onChange={e=>setApptDeptFilter(e.target.value)}>
+                        <option value="">Tất cả chuyên khoa</option>
+                        {departments.map(d=><option key={d.id} value={d.id}>{d.name}</option>)}
+                      </select>
+                    )}
+                  </div>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-sm">
@@ -348,7 +433,11 @@ const AdminDashboard = () => {
                             {appt.is_emergency && <span className="ml-2 text-[10px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded font-bold">CC</span>}
                           </td>
                           <td className="px-6 py-4">
-                            <div className="font-bold text-slate-800">{appt.patientName}</div>
+                            <div className="font-bold text-slate-800 flex items-center gap-2">
+                               {appt.patientName} 
+                               {appt.patientDob && <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-medium">{calcAge(appt.patientDob)}T</span>}
+                               {appt.patientGender && <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded font-medium">{appt.patientGender}</span>}
+                            </div>
                             <div className="text-xs text-slate-400">{appt.phone}</div>
                           </td>
                           <td className="px-6 py-4">
@@ -382,28 +471,29 @@ const AdminDashboard = () => {
                                     </button>
                                   )}
 
-                                  {/* Cấp cứu: tiếp nhận và chuyển khoa */}
-                                  {(appt.is_emergency || appt.status === 'EMERGENCY') && role !== 'RECEPTIONIST' && (
+                                  {/* Cấp cứu: tiếp nhận */}
+                                  {(appt.is_emergency || appt.status === 'EMERGENCY') && role !== 'RECEPTIONIST' && appt.status !== 'TRANSFER_PENDING' && (
                                     <>
                                       <button onClick={() => handleUpdateStatus(appt.id, 'ARRIVED')} className="text-xs bg-red-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-red-700 transition">
                                         Tiếp nhận CC
                                       </button>
-                                      {isEmergencyDept && (
-                                        <button
-                                          onClick={() => { setTransferModal(appt); setTransferTargetDept(''); setTransferReason(''); }}
-                                          className="text-xs bg-orange-500 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-orange-600 transition flex items-center gap-1"
-                                        >
-                                          <ArrowRightLeft size={12}/> Chuyển khoa
-                                        </button>
-                                      )}
                                     </>
                                   )}
-                                  {appt.status === 'EMERGENCY_TRANSFER' && isEmergencyDept && (
+
+                                  {/* Nhận bệnh nhân luân chuyển từ khoa khác */}
+                                  {appt.status === 'TRANSFER_PENDING' && role !== 'RECEPTIONIST' && (
+                                    <button onClick={() => handleUpdateStatus(appt.id, 'READY')} className="text-xs bg-orange-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-orange-700 transition animate-pulse">
+                                      Tiếp nhận ca chuyển
+                                    </button>
+                                  )}
+
+                                  {/* Bất cứ bác sĩ nào cũng chuyển khoa được */}
+                                  {role === 'DOCTOR' && appt.status !== 'CANCELED' && appt.status !== 'TRANSFER_PENDING' && (
                                     <button
                                       onClick={() => { setTransferModal(appt); setTransferTargetDept(''); setTransferReason(''); }}
                                       className="text-xs bg-orange-500 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-orange-600 transition flex items-center gap-1"
                                     >
-                                      <ArrowRightLeft size={12}/> Chuyển lại
+                                      <ArrowRightLeft size={12}/> Chuyển khoa
                                     </button>
                                   )}
 
@@ -576,11 +666,18 @@ const AdminDashboard = () => {
 
                 {/* Staff list */}
                 <div className={PERMS.canAddStaff(role) ? 'md:col-span-2' : 'md:col-span-3'}>
-                  {role === 'BOD' && (
-                    <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-xl px-5 py-3 text-sm font-semibold mb-4 flex items-center gap-2">
-                      <Shield size={15}/> Bạn đang xem danh sách toàn bộ bác sĩ — Phân quyền tài khoản do Admin IT quản lý
-                    </div>
-                  )}
+                  <div className="flex items-center justify-between mb-4">
+                    {role === 'BOD' ? (
+                      <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-xl px-5 py-3 text-sm font-semibold mb-4 flex items-center gap-2 w-full">
+                        <Shield size={15}/> Bạn đang xem danh sách toàn bộ bác sĩ — Phân quyền tài khoản do Admin IT quản lý
+                      </div>
+                    ) : (
+                      <div className="w-full relative">
+                        <input type="text" placeholder="Tìm kiếm theo Tên hoặc Tài khoản..." className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500" value={staffSearchQuery} onChange={e=>setStaffSearchQuery(e.target.value)} />
+                        <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                      </div>
+                    )}
+                  </div>
                   <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                     <div className="overflow-x-auto">
                       <table className="w-full text-left text-sm">
@@ -594,18 +691,14 @@ const AdminDashboard = () => {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-50">
-                          {staffList.map(staff => {
+                          {visibleStaff.length === 0 ? (
+                            <tr><td colSpan="5" className="text-center py-6 text-slate-400 font-semibold">Không tìm thấy tài khoản nhân sự.</td></tr>
+                          ) : visibleStaff.map(staff => {
                             const rc = getRoleConfig(staff.role);
                             return (
                               <tr key={staff.id} className={`transition hover:bg-slate-50 ${!staff.isActive ? 'opacity-50' : ''}`}>
                                 <td className="px-6 py-4">
                                   <div className="font-mono font-bold text-blue-700 text-sm">{staff.username}</div>
-                                  {role === 'ADMIN' && (
-                                    <div className="flex items-center gap-1.5 mt-1.5">
-                                      <span className="text-[10px] text-slate-400">Mật khẩu:</span>
-                                      <span className="font-mono text-xs font-bold bg-slate-100 text-slate-700 px-2 py-0.5 rounded tracking-widest">{staff.password}</span>
-                                    </div>
-                                  )}
                                 </td>
                                 <td className="px-6 py-4">
                                   <div className="font-bold text-slate-800">{staff.name}</div>
@@ -625,6 +718,12 @@ const AdminDashboard = () => {
                                 </td>
                                 <td className="px-6 py-4 text-right">
                                   <div className="flex items-center justify-end gap-2">
+                                    {/* Reset MK — CHỈ ADMIN */}
+                                    {role === 'ADMIN' && (
+                                      <button title="Cấp lại mật khẩu" onClick={() => setResetPassModal(staff.id)} className="px-2 py-1.5 rounded-lg text-slate-500 border border-slate-200 hover:bg-blue-50 transition hover:border-blue-200 hover:text-blue-600">
+                                        <Key size={14}/>
+                                      </button>
+                                    )}
                                     {/* Kích hoạt/Vô hiệu — ADMIN + BOD */}
                                     {PERMS.canToggleActive(role) && (
                                       <button
@@ -719,6 +818,25 @@ const AdminDashboard = () => {
               <div><span className="text-slate-400 text-xs block">Bệnh nhân</span><b>{examModal.patientName}</b></div>
               <div><span className="text-slate-400 text-xs block">Điện thoại</span><b>{examModal.phone}</b></div>
             </div>
+            {(() => {
+              const matchedPatient = patients.find(p => p.phone === examModal.phone || p.id === examModal.patientId);
+              const history = matchedPatient?.medicalHistory || [];
+              if (history.length > 0) {
+                return (
+                  <div className="px-6 py-3 bg-amber-50 border-b border-amber-100 flex flex-col gap-2 max-h-40 overflow-y-auto shrink-0">
+                    <div className="font-bold text-xs text-amber-800 uppercase flex items-center gap-1.5">Hồ sơ bệnh án cũ ({history.length})</div>
+                    {history.map((h, i) => (
+                      <div key={i} className="bg-white p-2.5 text-xs rounded-xl border border-amber-200/60 shadow-sm leading-relaxed">
+                        <div className="font-bold text-slate-700 mb-1">{h.date} - {h.doctor}:</div>
+                        <div><span className="font-semibold">CĐ:</span> <span className="text-slate-600">{h.diagnosis}</span></div>
+                        <div className="mt-0.5"><span className="font-semibold">Toa:</span> <span className="text-amber-700">{h.prescription}</span></div>
+                      </div>
+                    ))}
+                  </div>
+                );
+              }
+              return null;
+            })()}
             <form onSubmit={handleCompleteExam} className="p-6 overflow-y-auto flex-1 space-y-4">
               <div>
                 <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">Chẩn đoán bệnh <span className="text-red-500">*</span></label>
@@ -752,15 +870,33 @@ const AdminDashboard = () => {
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden">
             <div className="px-6 py-5 bg-gradient-to-r from-red-700 to-orange-600 text-white flex justify-between items-center">
               <h2 className="text-lg font-black flex items-center gap-2">
-                <ArrowRightLeft size={22}/> Chuyển Khoa Cấp Cứu
+                <ArrowRightLeft size={22}/> Luân Chuyển Bệnh Nhân
               </h2>
               <button onClick={() => setTransferModal(null)} className="text-white/70 hover:text-white font-bold text-2xl leading-none">&times;</button>
             </div>
-            <div className="px-6 py-4 bg-red-50 border-b border-red-100 text-sm">
+            <div className="px-6 py-4 bg-red-50 border-b border-red-100 text-sm shrink-0">
               <div className="font-bold text-red-800">🚨 Bệnh nhân: {transferModal.patientName}</div>
               <div className="text-red-600 text-xs mt-1">Mã hồ sơ: {transferModal.code} — {transferModal.phone}</div>
             </div>
-            <form onSubmit={handleTransferPatient} className="p-6 space-y-5">
+
+            {(() => {
+              const transfers = (transferModal.history || []).filter(h => h.action.startsWith('Chuyển khoa'));
+              if (transfers.length > 0) {
+                return (
+                  <div className="px-6 py-3 bg-white border-b border-slate-100 flex flex-col gap-2 max-h-32 overflow-y-auto shrink-0">
+                    <div className="font-bold text-xs text-slate-800 uppercase">Lịch sử luân chuyển</div>
+                    {transfers.map((t, i) => (
+                      <div key={i} className="text-xs text-slate-600 border-l-2 border-orange-400 pl-2 py-1 bg-orange-50">
+                        <span className="font-bold text-slate-800">{new Date(t.date).toLocaleTimeString('vi-VN')}</span>: {t.action}
+                      </div>
+                    ))}
+                  </div>
+                );
+              }
+              return null;
+            })()}
+
+            <form onSubmit={handleTransferPatient} className="p-6 overflow-y-auto flex-1 space-y-5">
               <div className="bg-orange-50 border border-orange-200 rounded-xl px-4 py-3 text-xs text-orange-800 font-semibold">
                 ⚠️ Sau khi chuyển, hồ sơ sẽ được ưu tiên lên đầu danh sách chờ của khoa tiếp nhận và bác sĩ sẽ được thông báo realtime.
               </div>
@@ -772,8 +908,8 @@ const AdminDashboard = () => {
                   value={transferTargetDept}
                   onChange={e => setTransferTargetDept(e.target.value)}
                 >
-                  <option value="">-- Chọn khoa chuyên môn --</option>
-                  {nonEmergencyDepts.map(d => (
+                  <option value="">-- Chọn khoa tiếp nhận --</option>
+                  {departments.map(d => (
                     <option key={d.id} value={d.id}>{d.name}</option>
                   ))}
                 </select>
@@ -853,6 +989,25 @@ const AdminDashboard = () => {
               <button onClick={() => setPatientDetailModal(false)} className="px-6 py-2.5 rounded-xl font-bold bg-slate-800 text-white hover:bg-slate-900 transition text-sm">Đóng</button>
             </div>
           </div>
+        </div>
+      )}
+      
+      {/* Reset Mật Khẩu Staff Modal */}
+      {resetPassModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+          <form onSubmit={handleResetPassword} className="bg-white rounded-3xl shadow-2xl p-6 w-full max-w-sm animate-in zoom-in-95">
+            <h3 className="text-lg font-bold text-slate-800 mb-2 flex items-center gap-2 border-b pb-4">
+              <Key size={18} className="text-blue-600"/> Cấp lại Mật khẩu
+            </h3>
+            <div className="mb-6 mt-4">
+               <label className="block text-xs font-bold text-slate-700 mb-2">Mật khẩu cấp mới</label>
+               <input required type="text" className="w-full p-3 border border-slate-300 rounded-xl outline-none focus:ring-2 focus:ring-blue-500" value={resetPassValue} onChange={e=>setResetPassValue(e.target.value)} placeholder="Nhập vào mật khẩu mới..." />
+            </div>
+            <div className="flex gap-3">
+              <button type="button" onClick={() => { setResetPassModal(null); setResetPassValue(''); }} className="flex-1 py-3 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition">Hủy bỏ</button>
+              <button type="submit" className="flex-1 py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition">Lưu cập nhật</button>
+            </div>
+          </form>
         </div>
       )}
 

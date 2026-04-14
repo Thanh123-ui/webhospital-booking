@@ -6,5 +6,6 @@ router.get('/', staffController.getAllStaff);
 router.post('/', staffController.addStaff);
 router.put('/:id/role', staffController.updateStaffRole);
 router.put('/:id/toggle-active', staffController.toggleStaffActive);
+router.put('/:id/password', staffController.updateStaffPassword);
 
 module.exports = router;

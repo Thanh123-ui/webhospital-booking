@@ -4,5 +4,6 @@ const patientsController = require('../controllers/patients.controller');
 
 router.get('/', patientsController.getAllPatients);
 router.post('/register', patientsController.registerPatient);
+router.put('/:id', patientsController.updatePatient);
 
 module.exports = router;

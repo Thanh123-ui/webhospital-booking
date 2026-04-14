@@ -12,6 +12,11 @@ const mockDoctors = [
   { id: 3, deptId: 3, name: 'BS. Lê Răng Sứ', title: 'BS Răng Hàm Mặt', avatar: '👨‍⚕️', exp: '8 năm', username: 'bssu', password: 'bssu@2024' },
   { id: 4, deptId: 4, name: 'BS. Phạm Não', title: 'PGS. TS. Bác sĩ', avatar: '👨‍⚕️', exp: '20 năm', username: 'bsnao', password: 'bsnao@2024' },
   { id: 11, deptId: 5, name: 'BS. Lê Văn Cấp', title: 'BS Cấp cứu - Hồi sức tích cực', avatar: '🧑‍⚕️', exp: '12 năm', username: 'bscap', password: 'bscap@2024' },
+  { id: 13, deptId: 1, name: 'BS. Hoàng Mạch', title: 'Thạc sĩ', avatar: '👨‍⚕️', exp: '5 năm', username: 'bsmach', password: 'bsmach@2024' },
+  { id: 14, deptId: 2, name: 'BS. Trương Đồng', title: 'Bác sĩ Nhi Khoa', avatar: '👩‍⚕️', exp: '7 năm', username: 'bsdong', password: 'bsdong@2024' },
+  { id: 15, deptId: 3, name: 'BS. Đào Nha', title: 'BS Răng Hàm Mặt', avatar: '👨‍⚕️', exp: '6 năm', username: 'bsnha', password: 'bsnha@2024' },
+  { id: 16, deptId: 4, name: 'BS. Ninh Tủy', title: 'Tiến sĩ, Bác sĩ', avatar: '👨‍⚕️', exp: '11 năm', username: 'bstuy', password: 'bstuy@2024' },
+  { id: 17, deptId: 5, name: 'BS. Đỗ Trọng', title: 'BS Cấp cứu', avatar: '👨‍⚕️', exp: '9 năm', username: 'bstrong', password: 'bstrong@2024' },
 ];
 
 const initialStaff = [

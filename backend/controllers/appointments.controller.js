@@ -9,14 +9,19 @@ const { writeLog } = require('../utils/logger');
  * quá tải khoa (có thể bật/tắt tùy yêu cầu — hiện chỉ chặn trùng bác sĩ).
  */
 function checkCollision(doctorId, date, time, excludeId = null) {
+    const targetStaff = db.staffList.find(s => s.id === parseInt(doctorId));
+    if (!targetStaff) return false;
+    
+    // Đếm tổng số lịch hẹn của các bác sĩ CÙNG KHOA vào giờ này
     const conflicts = db.appointmentsList.filter(a =>
-        a.doctorId === parseInt(doctorId) &&
+        a.deptId === targetStaff.deptId &&
         a.date === date &&
         a.time === time &&
         a.status !== 'CANCELED' &&
         a.id !== excludeId
     );
-    return conflicts.length > 0;
+    // Nếu khung giờ này của khoa đã đủ 5 người thì báo Full
+    return conflicts.length >= 5;
 }
 
 /**
@@ -38,19 +43,22 @@ exports.getAllAppointments = (req, res) => {
 
     if (role === 'DOCTOR' && deptId) {
         const parsedDeptId = parseInt(deptId);
-        const docIds = db.staffList
-            .filter(s => s.role === 'DOCTOR' && s.deptId === parsedDeptId)
-            .map(s => s.id);
-        result = result.filter(a => docIds.includes(a.doctorId));
+        result = result.filter(a => a.deptId === parsedDeptId);
     }
 
     if (role === 'NURSE' && deptId) {
         const parsedDeptId = parseInt(deptId);
-        const docIds = db.staffList
-            .filter(s => s.role === 'DOCTOR' && s.deptId === parsedDeptId)
-            .map(s => s.id);
-        result = result.filter(a => docIds.includes(a.doctorId));
+        result = result.filter(a => a.deptId === parsedDeptId);
     }
+
+    result = result.map(a => {
+        const patient = db.patientsList.find(p => p.phone === a.phone);
+        return {
+            ...a,
+            patientDob: patient ? patient.dob : null,
+            patientGender: patient ? patient.gender : null
+        };
+    });
 
     res.json(result);
 };
@@ -84,7 +92,7 @@ exports.createAppointment = (req, res) => {
     if (!data.is_emergency && data.doctorId && data.date && data.time && data.status !== 'EMERGENCY') {
         if (checkCollision(data.doctorId, data.date, data.time)) {
             return res.status(409).json({
-                message: 'Khung giờ này đã có bệnh nhân khác đặt với cùng bác sĩ. Vui lòng chọn khung giờ hoặc bác sĩ khác.'
+                message: 'Khung giờ này của khoa đã đạt giới hạn 5 bệnh nhân. Vui lòng chọn khung giờ hoặc bác sĩ khác.'
             });
         }
     }
@@ -206,7 +214,7 @@ exports.reschedule = (req, res) => {
     if (apptIndex === -1) return res.status(404).json({ message: 'Not found' });
 
     if (checkCollision(doctorId, date, time, parseInt(id))) {
-        return res.status(409).json({ message: 'Khung giờ mới đã bị trùng lịch với bác sĩ này.' });
+        return res.status(409).json({ message: 'Khung giờ mới của khoa đã đạt giới hạn 5 bệnh nhân.' });
     }
 
     db.appointmentsList[apptIndex].doctorId = parseInt(doctorId);
@@ -276,10 +284,8 @@ exports.transferPatient = (req, res) => {
 
     const appt = db.appointmentsList[apptIndex];
 
-    // Chỉ hồ sơ cấp cứu mới được chuyển khoa
-    if (!appt.is_emergency) {
-        return res.status(403).json({ message: 'Chỉ hồ sơ cấp cứu mới có thể chuyển khoa.' });
-    }
+    // Cho phép mọi hồ sơ kể cả khám thường & cấp cứu đều được chuyển khoa.
+    // (Gỡ bỏ quy định chỉ riêng cấp cứu mới được chuyển)
 
     const targetDept = db.mockDepartments.find(d => d.id === parseInt(targetDeptId));
     if (!targetDept) {
@@ -294,7 +300,7 @@ exports.transferPatient = (req, res) => {
     // Cập nhật hồ sơ
     db.appointmentsList[apptIndex].current_department = parseInt(targetDeptId);
     db.appointmentsList[apptIndex].deptId = parseInt(targetDeptId);
-    db.appointmentsList[apptIndex].status = 'EMERGENCY_TRANSFER';
+    db.appointmentsList[apptIndex].status = 'TRANSFER_PENDING';
     db.appointmentsList[apptIndex].history.push({
         date: new Date().toISOString(),
         action: `Chuyển khoa: ${prevDeptName} → ${targetDept.name}. Lý do: ${reason || 'Không ghi rõ'}`,

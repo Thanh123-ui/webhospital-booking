@@ -33,10 +33,12 @@ export const api = {
 
   getAllPatients: (role, deptId) => apiClient.get('/patients', { params: { role, deptId } }),
   registerPatient: (data) => apiClient.post('/patients/register', data),
+  updatePatientProfile: (id, data) => apiClient.put(`/patients/${id}`, data),
 
   getAllStaff: (role) => apiClient.get('/staff', { params: role ? { role } : {} }),
   addStaff: (data) => apiClient.post('/staff', data),
   updateStaffRole: (id, role, requesterRole) => apiClient.put(`/staff/${id}/role`, { role, requesterRole }),
   toggleStaffActive: (id, requesterRole) => apiClient.put(`/staff/${id}/toggle-active`, { requesterRole }),
+  resetStaffPassword: (id, newPassword, requesterRole) => apiClient.put(`/staff/${id}/password`, { newPassword, requesterRole }),
 };
 
