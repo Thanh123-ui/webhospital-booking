@@ -1,10 +1,12 @@
+require('dotenv').config(); // ← Load .env TRƯỚC KHI require db.js
+
 const express = require('express');
 const cors = require('cors');
 const http = require('http');
 const { Server } = require('socket.io');
 
 const app = express();
-const PORT = 5000;
+const PORT = process.env.PORT || 5000;
 
 const server = http.createServer(app);
 const io = new Server(server, {

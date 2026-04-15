@@ -6,6 +6,8 @@ import {
   ArrowRight, Clock, MapPin, Ambulance, Award, Users, Activity
 } from 'lucide-react';
 import { api } from '../../services/api';
+import HospitalStatsGrid from '../../components/shared/HospitalStatsGrid';
+import EmergencyCard from '../../components/shared/EmergencyCard';
 
 const DEPT_ICONS = {
   'Tim mạch': <HeartPulse size={28} className="text-red-500" />,
@@ -54,7 +56,7 @@ const PatientHome = () => {
               </h1>
 
               <p className="text-blue-100 text-lg mb-8 max-w-lg leading-relaxed font-light">
-                Hệ thống bệnh viện đa khoa hàng đầu với đội ngũ bác sĩ chuyên môn cao, trang thiết bị hiện đại và dịch vụ chăm sóc bệnh nhân 24/7.
+                Bệnh viện Đa khoa Quốc tế ClinicCare — nơi hội tụ đội ngũ bác sĩ đầu ngành từ các chuyên khoa Tim mạch, Thần kinh, Nhi khoa và Nha khoa. Đặt lịch online, nhận kết quả nhanh — không cần xếp hàng chờ đợi.
               </p>
 
               <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
@@ -83,31 +85,8 @@ const PatientHome = () => {
 
             {/* Right: Stats card */}
             <div className="lg:w-80 w-full">
-              <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-3xl p-6 grid grid-cols-2 gap-4">
-                {[
-                  { num: '20+', label: 'Năm kinh nghiệm', icon: <Award size={22} className="text-yellow-400" /> },
-                  { num: '50+', label: 'Chuyên gia Y tế', icon: <Stethoscope size={22} className="text-blue-300" /> },
-                  { num: '100k+', label: 'Bệnh nhân tin tưởng', icon: <Users size={22} className="text-green-400" /> },
-                  { num: '4.9★', label: 'Điểm hài lòng', icon: <Star size={22} className="text-yellow-300" /> },
-                ].map((s, i) => (
-                  <div key={i} className="bg-white/10 rounded-2xl p-4 text-center hover:bg-white/20 transition">
-                    <div className="flex justify-center mb-2">{s.icon}</div>
-                    <div className="text-2xl font-black text-white">{s.num}</div>
-                    <div className="text-[11px] text-blue-200 font-medium mt-1 leading-tight">{s.label}</div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="mt-4 bg-red-600/90 backdrop-blur-sm border border-red-400/30 rounded-2xl p-4 flex items-center gap-4 text-white">
-                <div className="w-12 h-12 bg-red-500 rounded-xl flex items-center justify-center shrink-0">
-                  <Ambulance size={24} />
-                </div>
-                <div>
-                  <div className="font-black text-sm">Cấp cứu 24/7</div>
-                  <div className="text-red-200 text-xs mt-0.5">Đội cấp cứu luôn sẵn sàng</div>
-                  <div className="text-xl font-black mt-1">1900 1234</div>
-                </div>
-              </div>
+              <HospitalStatsGrid />
+              <EmergencyCard />
             </div>
           </div>
         </div>
@@ -211,11 +190,14 @@ const PatientHome = () => {
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-14">
             <div className="text-blue-600 font-bold tracking-widest uppercase text-xs mb-3">Đội ngũ Y tế</div>
-            <h2 className="text-4xl font-black text-slate-800 mb-4">Gặp Gỡ Các Chuyên Gia</h2>
-            <p className="text-slate-500 max-w-xl mx-auto">Những bác sĩ hàng đầu được tin tưởng bởi hàng nghìn bệnh nhân</p>
+            <h2 className="text-4xl font-black text-slate-800 mb-4">Đội Ngũ Bác Sĩ</h2>
+            <p className="text-slate-500 max-w-xl mx-auto">Các chuyên gia nhiều năm kinh nghiệm lâm sàng, được đào tạo tại các cơ sở y tế uy tín trong và ngoài nước.</p>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
-            {doctors.map(doc => (
+            {doctors.filter(doc => {
+              const dept = departments.find(d => d.id === doc.deptId);
+              return dept && !dept.isEmergency;
+            }).map(doc => (
               <div key={doc.id} className="group text-center">
                 <div className="relative w-36 h-36 mx-auto mb-5">
                   <div className="w-full h-full rounded-2xl bg-gradient-to-br from-blue-50 to-blue-100 border-4 border-white shadow-xl flex items-center justify-center text-5xl overflow-hidden group-hover:shadow-2xl transition-all group-hover:scale-105">
@@ -248,8 +230,8 @@ const PatientHome = () => {
       {/* ===== CTA BOTTOM ===== */}
       <section className="bg-gradient-to-r from-teal-600 to-blue-700 py-16 px-6">
         <div className="max-w-4xl mx-auto text-center">
-          <h2 className="text-3xl md:text-4xl font-black text-white mb-4">Sẵn sàng đặt lịch khám?</h2>
-          <p className="text-blue-100 mb-8 text-lg">Chỉ vài bước đơn giản, bác sĩ sẽ gặp bạn vào đúng khung giờ bạn chọn.</p>
+          <h2 className="text-3xl md:text-4xl font-black text-white mb-4">Đặt lịch ngay hôm nay</h2>
+          <p className="text-blue-100 mb-8 text-lg">Chủ động thời gian thăm khám — Xác nhận lịch hẹn trong vòng 30 phút làm việc. Không phí chờ đợi.</p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <button
               onClick={() => navigate('/book')}
@@ -277,7 +259,7 @@ const PatientHome = () => {
               </div>
               <span className="text-white font-black text-lg">HOSPITAL</span>
             </div>
-            <p className="text-sm leading-relaxed">Bệnh viện đa khoa hàng đầu tại TP.HCM với hơn 20 năm kinh nghiệm chăm sóc sức khỏe cộng đồng.</p>
+            <p className="text-sm leading-relaxed">Thành lập năm 2001, Bệnh viện Đa khoa Quốc tế ClinicCare là địa chỉ y tế tin cậy của hơn 128.000 bệnh nhân tại TP.HCM và các tỉnh lân cận.</p>
           </div>
           <div>
             <div className="text-white font-bold mb-4">Chuyên khoa</div>
@@ -303,8 +285,7 @@ const PatientHome = () => {
           </div>
         </div>
         <div className="max-w-6xl mx-auto mt-10 pt-6 border-t border-slate-800 text-center text-xs text-slate-500">
-          © 2024 Hospital. Bảo lưu mọi quyền. Hệ thống quản lý y tế v2.1
-        </div>
+          © 2001–2024 Bệnh viện Đa khoa Quốc tế ClinicCare. Giấy phép HĐKD số 0312345678 — Sở Y tế TP.HCM cấp phép.</div>
       </footer>
     </div>
   );

@@ -59,6 +59,14 @@ const PatientProfile = () => {
      }
   }
 
+  // POLICY B — Frontend: kiểm tra còn >= 24h trước giờ khám không
+  const canCancelAppt = (date, time) => {
+    if (!date || !time) return false;
+    const appointmentDT = new Date(`${date}T${time}:00`);
+    const diffHours = (appointmentDT - new Date()) / (1000 * 60 * 60);
+    return diffHours >= 24;
+  };
+
   const handleCancelAppt = async (id) => {
     if(!window.confirm("Bạn có chắc chắn muốn hủy lịch khám này không?")) return;
     try {
@@ -66,7 +74,8 @@ const PatientProfile = () => {
       fetchAppts();
       alert("Đã gửi yêu cầu hủy lịch.");
     } catch(err) {
-      alert("Lỗi khi hủy lịch.");
+      const msg = err?.response?.data?.message || 'Lỗi khi hủy lịch.';
+      alert(msg);
     }
   }
 
@@ -111,7 +120,9 @@ const PatientProfile = () => {
                      </div>
                       <div>{getStatusBadge(appt.status)}</div>
                       {(appt.status === 'PENDING' || appt.status === 'CONFIRMED') && (
-                         <button onClick={() => handleCancelAppt(appt.id)} className="text-xs text-red-500 hover:text-red-700 font-bold border border-red-200 px-3 py-1.5 rounded-lg hover:bg-red-50 transition">Hủy lịch</button>
+                        canCancelAppt(appt.date, appt.time)
+                          ? <button onClick={() => handleCancelAppt(appt.id)} className="text-xs text-red-500 hover:text-red-700 font-bold border border-red-200 px-3 py-1.5 rounded-lg hover:bg-red-50 transition">Hủy lịch</button>
+                          : <span className="text-xs text-slate-400 border border-slate-200 px-3 py-1.5 rounded-lg cursor-not-allowed" title="Chỉ hủy được trước giờ hẹn 24 tiếng">Không thể hủy</span>
                       )}
                    </div>
                 ))}

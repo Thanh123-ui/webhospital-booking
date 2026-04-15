@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { CalendarCheck, Check, Activity, Award, ArrowRight, ChevronRight, User, Clock, FileText } from 'lucide-react';
+import { CalendarCheck, Check, Activity, Award, ArrowRight, ChevronRight, User, Clock, FileText, AlertCircle } from 'lucide-react';
 import { api } from '../../services/api';
 import { useAuth } from '../../services/AuthContext';
 
@@ -11,6 +11,7 @@ const BookingWizard = () => {
   const [step, setStep] = useState(1);
   const [bookingData, setBookingData] = useState({ dept: '', doctorId: '', date: '', time: '', name: '', phone: '', email: '', dob: '', cccd: '', gender: '', symptoms: '' });
   const [bookedCode, setBookedCode] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
   
   const [departments, setDepartments] = useState([]);
   const [doctors, setDoctors] = useState([]);
@@ -84,7 +85,8 @@ const BookingWizard = () => {
       setBookedCode(res.data.code);
       setStep(4);
     } catch(err) {
-      alert("Lỗi khi đặt lịch!");
+      const msg = err?.response?.data?.message || "Bệnh viện hiện không thể tiếp nhận yêu cầu. Quý khách vui lòng thử lại sau.";
+      setErrorMessage(msg);
     }
   };
 
@@ -159,9 +161,7 @@ const BookingWizard = () => {
                   <ChevronRight size={20} className="rotate-180" /> Quay lại chọn bác sĩ
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-slate-800 mb-4 flex justify-between items-end">
-                    Ngày khám <span className="text-xs font-normal text-slate-500">* Lịch trong quá khứ đã được ẩn</span>
-                  </h3>
+                  <h3 className="text-lg font-bold text-slate-800 mb-4">Ngày khám</h3>
                   {availableDates.length === 0 ? (
                      <div className="p-4 bg-yellow-50 text-yellow-700 border border-yellow-200 rounded-lg">Bác sĩ này hiện không còn lịch trống trong thời gian tới. Vui lòng chọn bác sĩ khác.</div>
                   ) : (
@@ -337,6 +337,26 @@ const BookingWizard = () => {
           </div>
         )}
       </div>
+
+      {/* Error Modal */}
+      {errorMessage && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95">
+             <div className="p-8 text-center">
+                <div className="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-5 shadow-inner">
+                   <AlertCircle size={32} />
+                </div>
+                <h3 className="text-2xl font-bold text-slate-800 mb-3">Thông báo từ Bệnh viện</h3>
+                <p className="text-slate-600 mb-8 leading-relaxed whitespace-pre-line text-left bg-slate-50 p-4 rounded-xl border border-slate-100">{errorMessage}</p>
+                <div className="flex justify-center">
+                   <button onClick={() => setErrorMessage('')} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold px-10 py-3.5 rounded-xl transition-colors shadow-lg shadow-blue-600/30">
+                     Đã hiểu
+                   </button>
+                </div>
+             </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

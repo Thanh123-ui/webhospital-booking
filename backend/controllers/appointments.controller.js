@@ -35,6 +35,28 @@ function isTooSoon(date, time) {
     return diffHours < 2;
 }
 
+/**
+ * POLICY A — Anti-Spam: kiểm tra bệnh nhân có >= 2 lịch đang PENDING không.
+ */
+function hasSpamBooking(phone, patientId) {
+    const pendingCount = db.appointmentsList.filter(a =>
+        (a.phone === phone || (patientId && a.patientId === parseInt(patientId))) &&
+        a.status === 'PENDING'
+    ).length;
+    return pendingCount >= 2;
+}
+
+/**
+ * POLICY B — Kiểm tra còn đủ 24h trước giờ hẹn không (để cho phép hủy).
+ */
+function canCancelByTime(date, time) {
+    const appointmentDT = new Date(`${date}T${time}:00`);
+    const now = new Date();
+    const diffMs = appointmentDT - now;
+    const diffHours = diffMs / (1000 * 60 * 60);
+    return diffHours >= 24;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 exports.getAllAppointments = (req, res) => {
@@ -79,11 +101,20 @@ exports.getAppointmentByCode = (req, res) => {
 exports.createAppointment = (req, res) => {
     const data = req.body;
 
+    // ── POLICY A: Anti-Spam — chặn nếu bệnh nhân đang có >= 2 lịch PENDING ─
+    if (!data.is_emergency && data.status !== 'EMERGENCY' && (data.phone || data.patientId)) {
+        if (hasSpamBooking(data.phone, data.patientId)) {
+            return res.status(429).json({
+                message: 'Hệ thống ghi nhận Quý khách đang có từ 2 lịch hẹn chờ khám. \nNhằm đảm bảo cơ hội thăm khám cho cộng đồng, vui lòng hoàn tất hoặc hủy lịch cũ trước khi đặt thêm lịch mới.'
+            });
+        }
+    }
+
     // ── POLICY 1: Chặn đặt lịch dưới 2 tiếng (bypass nếu is_emergency) ────
     if (!data.is_emergency && data.status !== 'EMERGENCY' && data.date && data.time) {
         if (isTooSoon(data.date, data.time)) {
             return res.status(400).json({
-                message: 'Không thể đặt lịch cho khung giờ cách hiện tại dưới 2 tiếng. Vui lòng chọn khung giờ khác hoặc gọi hotline để đặt khẩn.'
+                message: 'Giờ hẹn Quý khách chọn quá sát giờ hiện tại (dưới 2 tiếng). \nĐể Bệnh viện có thể chuẩn bị đón tiếp chu đáo nhất, vui lòng chọn khung giờ khác xa hơn. Trong trường hợp khẩn cấp, vui lòng đến trực tiếp Khoa Cấp Cứu hoặc gọi Hotline 1900 1234.'
             });
         }
     }
@@ -92,7 +123,7 @@ exports.createAppointment = (req, res) => {
     if (!data.is_emergency && data.doctorId && data.date && data.time && data.status !== 'EMERGENCY') {
         if (checkCollision(data.doctorId, data.date, data.time)) {
             return res.status(409).json({
-                message: 'Khung giờ này của khoa đã đạt giới hạn 5 bệnh nhân. Vui lòng chọn khung giờ hoặc bác sĩ khác.'
+                message: 'Khung giờ này đã nhận đủ số lượng Thăm khám tối đa, nhằm đảm bảo chất lượng phục vụ và tránh quá tải cho Bác sĩ. \nQuý khách vui lòng chọn ca khám hoặc một Bác sĩ khác.'
             });
         }
     }
@@ -256,6 +287,15 @@ exports.cancelAppointment = (req, res) => {
         });
     }
 
+    // POLICY B: Bệnh nhân chỉ được hủy nếu còn >= 24h trước giờ khám
+    if (role === 'PATIENT' && appt.date && appt.time) {
+        if (!canCancelByTime(appt.date, appt.time)) {
+            return res.status(400).json({
+                message: 'Theo quy định, thao tác hủy lịch chỉ được thực hiện trên hệ thống tối thiểu 24 tiếng trước giờ hẹn để bác sĩ sắp xếp lịch trình.\nVui lòng liên hệ bộ phận CSKH qua Hotline 1900 1234 để được hỗ trợ trực tiếp.'
+            });
+        }
+    }
+
     db.appointmentsList[apptIndex].status = 'CANCELED';
     db.appointmentsList[apptIndex].history.push({
         date: new Date().toISOString(),
@@ -292,7 +332,12 @@ exports.transferPatient = (req, res) => {
         return res.status(404).json({ message: 'Khoa tiếp nhận không tồn tại.' });
     }
 
-    const prevDeptId = appt.current_department;
+    const prevDeptId = appt.current_department || appt.deptId;
+    
+    if (prevDeptId && parseInt(targetDeptId) === prevDeptId) {
+        return res.status(400).json({ message: 'Không thể chuyển bệnh nhân vào chính khoa đang điều trị.' });
+    }
+
     const prevDeptName = prevDeptId
         ? (db.mockDepartments.find(d => d.id === prevDeptId)?.name || 'Không rõ')
         : 'Cấp cứu';

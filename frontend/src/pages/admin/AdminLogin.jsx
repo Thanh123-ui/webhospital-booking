@@ -1,15 +1,11 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Lock, Eye, EyeOff, ArrowLeft, ShieldCheck, Award, Stethoscope, Users, Star, Ambulance } from 'lucide-react';
+import { Lock, Eye, EyeOff, ArrowLeft, ShieldCheck } from 'lucide-react';
 import { useAuth } from '../../services/AuthContext';
 import { api } from '../../services/api';
-
-const HOSPITAL_STATS = [
-  { num: '20+', label: 'Năm kinh nghiệm', icon: <Award size={22} className="text-yellow-400" /> },
-  { num: '50+', label: 'Chuyên gia Y tế', icon: <Stethoscope size={22} className="text-sky-300" /> },
-  { num: '100k+', label: 'Bệnh nhân tin tưởng', icon: <Users size={22} className="text-green-400" /> },
-  { num: '4.9★', label: 'Điểm hài lòng', icon: <Star size={22} className="text-yellow-300" /> },
-];
+import HospitalStatsGrid from '../../components/shared/HospitalStatsGrid';
+import EmergencyCard from '../../components/shared/EmergencyCard';
+import { HOSPITAL_COPYRIGHT } from '../../utils/constants';
 
 const AdminLogin = () => {
   const navigate = useNavigate();
@@ -80,31 +76,12 @@ const AdminLogin = () => {
           </p>
 
           {/* Stats grid — đồng bộ với trang chủ bệnh nhân */}
-          <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-3xl p-5 grid grid-cols-2 gap-4">
-            {HOSPITAL_STATS.map((s, i) => (
-              <div key={i} className="bg-white/10 rounded-2xl p-4 text-center hover:bg-white/20 transition cursor-default">
-                <div className="flex justify-center mb-2">{s.icon}</div>
-                <div className="text-2xl font-black text-white">{s.num}</div>
-                <div className="text-[11px] text-blue-200 font-medium mt-1 leading-tight">{s.label}</div>
-              </div>
-            ))}
-          </div>
-
-          {/* Emergency card */}
-          <div className="mt-4 bg-red-600/90 backdrop-blur-sm border border-red-400/30 rounded-2xl p-4 flex items-center gap-4 text-white">
-            <div className="w-12 h-12 bg-red-500 rounded-xl flex items-center justify-center shrink-0">
-              <Ambulance size={24}/>
-            </div>
-            <div>
-              <div className="font-black text-sm">Cấp cứu 24/7</div>
-              <div className="text-red-200 text-xs mt-0.5">Đội cấp cứu luôn sẵn sàng</div>
-              <div className="text-xl font-black mt-1">1900 1234</div>
-            </div>
-          </div>
+          <HospitalStatsGrid />
+          <EmergencyCard />
         </div>
 
         <div className="relative z-10 text-slate-600 text-xs">
-          © 2024 Hospital Management System v2.1 — Bảo hành bảo mật ISO 27001
+          {HOSPITAL_COPYRIGHT}
         </div>
       </div>
 
@@ -172,7 +149,7 @@ const AdminLogin = () => {
                     {showPass ? <EyeOff size={20}/> : <Eye size={20}/>}
                   </button>
                 </div>
-                <p className="text-xs text-slate-600 mt-1.5">* Tài khoản test dùng mật khẩu: <code className="text-sky-400 font-mono bg-white/5 px-1.5 py-0.5 rounded">123</code></p>
+
               </div>
 
               <button type="submit" disabled={loading}

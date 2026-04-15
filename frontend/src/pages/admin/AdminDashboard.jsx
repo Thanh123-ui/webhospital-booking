@@ -353,28 +353,6 @@ const AdminDashboard = () => {
                 <Shield size={13}/> Ban Giám Đốc
               </div>
             )}
-            {activeTab === 'list' && (
-              <div className="flex items-center gap-2 ml-2 pl-2 border-l border-slate-100">
-                <div className="text-center px-3 py-1.5 bg-slate-50 rounded-xl border border-slate-100">
-                  <div className="text-lg font-black text-slate-700">{stats.total}</div>
-                  <div className="text-[9px] font-bold text-slate-400 uppercase">Tổng</div>
-                </div>
-                <div className="text-center px-3 py-1.5 bg-orange-50 rounded-xl border border-orange-100">
-                  <div className="text-lg font-black text-orange-600">{stats.waiting}</div>
-                  <div className="text-[9px] font-bold text-orange-400 uppercase">Chờ</div>
-                </div>
-                <div className="text-center px-3 py-1.5 bg-green-50 rounded-xl border border-green-100">
-                  <div className="text-lg font-black text-green-600">{stats.done}</div>
-                  <div className="text-[9px] font-bold text-green-400 uppercase">Xong</div>
-                </div>
-                {stats.emergency > 0 && (
-                  <div className="text-center px-3 py-1.5 bg-red-50 rounded-xl border border-red-100 animate-pulse">
-                    <div className="text-lg font-black text-red-600">{stats.emergency}</div>
-                    <div className="text-[9px] font-bold text-red-400 uppercase">CC</div>
-                  </div>
-                )}
-              </div>
-            )}
           </div>
         </div>
 
@@ -383,25 +361,43 @@ const AdminDashboard = () => {
           {/* ── TAB: Appointments ── */}
           {activeTab === 'list' && (
             <div className="animate-in fade-in">
-              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                <div className="px-6 py-4 border-b border-slate-100 flex flex-col md:flex-row justify-between items-center bg-slate-50 gap-4">
-                  <div className="flex items-center gap-3">
-                    <span className="font-bold text-slate-700 bg-white px-3 py-1.5 border rounded-lg shadow-sm">Thống kê: {stats.total} ca</span>
-                    <span className="text-xs font-semibold text-orange-600 bg-orange-50 px-2 py-1 rounded-md border border-orange-200">{stats.waiting} Đang chờ</span>
-                    <span className="text-xs font-semibold text-green-600 bg-green-50 px-2 py-1 rounded-md border border-green-200">{stats.done} Đã khám xong</span>
+              {/* Stats cards */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                {[
+                  { label: 'Tổng lịch hẹn', value: stats.total,     color: 'from-blue-600 to-blue-500',   icon: <Calendar size={22} className="text-white/80"/> },
+                  { label: 'Đang chờ khám', value: stats.waiting,   color: 'from-orange-500 to-amber-500', icon: <Activity size={22} className="text-white/80"/> },
+                  { label: 'Đã hoàn tất',    value: stats.done,     color: 'from-green-600 to-teal-500',  icon: <Check size={22} className="text-white/80"/> },
+                  { label: 'Cấp cứu',        value: stats.emergency, color: 'from-red-600 to-rose-500',    icon: <AlertTriangle size={22} className="text-white/80"/> },
+                ].map((s, i) => (
+                  <div key={i} className={`bg-gradient-to-br ${s.color} rounded-2xl p-5 text-white shadow-lg`}>
+                    <div className="flex justify-between items-start mb-3">
+                      <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">{s.icon}</div>
+                      {s.value > 0 && i === 3 && <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full font-bold animate-pulse">🚨 Hoạt động</span>}
+                    </div>
+                    <div className="text-3xl font-black">{s.value}</div>
+                    <div className="text-white/70 text-xs font-semibold mt-1 uppercase tracking-wider">{s.label}</div>
                   </div>
-                  
-                  <div className="flex flex-wrap items-center gap-3">
-                    <input type="date" className="text-xs p-2 border rounded-lg outline-none text-slate-600" value={apptDateFilter} onChange={e=>setApptDateFilter(e.target.value)} />
-                    <select className="text-xs p-2 border rounded-lg outline-none text-slate-600" value={apptTimeFilter} onChange={e=>setApptTimeFilter(e.target.value)}>
-                      <option value="">Lọc theo Giờ</option>
-                      {['08:00', '09:00', '10:00', '14:00', '15:00', '16:00', '18:00', '20:00'].map(t=><option key={t} value={t}>{t}</option>)}
+                ))}
+              </div>
+
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                {/* Filter bar */}
+                <div className="px-6 py-4 border-b border-slate-100 flex flex-col md:flex-row justify-between items-center bg-slate-50/80 gap-3">
+                  <div className="text-sm font-bold text-slate-600">📅 Danh sách lịch khám hôm nay</div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <input type="date" className="text-xs px-3 py-2 border border-slate-200 rounded-xl outline-none text-slate-600 bg-white focus:ring-2 focus:ring-blue-400" value={apptDateFilter} onChange={e=>setApptDateFilter(e.target.value)} />
+                    <select className="text-xs px-3 py-2 border border-slate-200 rounded-xl outline-none text-slate-600 bg-white focus:ring-2 focus:ring-blue-400" value={apptTimeFilter} onChange={e=>setApptTimeFilter(e.target.value)}>
+                      <option value="">Tất cả giờ</option>
+                      {[...new Set(visibleAppointments.map(a => a.time).filter(Boolean))].sort().map(t=><option key={t} value={t}>{t}</option>)}
                     </select>
                     {!currentDept && (
-                      <select className="text-xs p-2 border rounded-lg outline-none text-slate-600 max-w-[120px]" value={apptDeptFilter} onChange={e=>setApptDeptFilter(e.target.value)}>
+                      <select className="text-xs px-3 py-2 border border-slate-200 rounded-xl outline-none text-slate-600 bg-white focus:ring-2 focus:ring-blue-400" value={apptDeptFilter} onChange={e=>setApptDeptFilter(e.target.value)}>
                         <option value="">Tất cả chuyên khoa</option>
                         {departments.map(d=><option key={d.id} value={d.id}>{d.name}</option>)}
                       </select>
+                    )}
+                    {(apptDateFilter || apptTimeFilter || apptDeptFilter) && (
+                      <button onClick={() => { setApptDateFilter(''); setApptTimeFilter(''); setApptDeptFilter(''); }} className="text-xs px-3 py-2 bg-red-50 text-red-600 border border-red-200 rounded-xl font-bold hover:bg-red-100 transition">Xóa bộ lọc</button>
                     )}
                   </div>
                 </div>
@@ -409,110 +405,95 @@ const AdminDashboard = () => {
                   <table className="w-full text-left text-sm">
                     <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider">
                       <tr>
-                        <th className="px-6 py-4 font-bold">Mã</th>
-                        <th className="px-6 py-4 font-bold">Bệnh nhân</th>
-                        <th className="px-6 py-4 font-bold">Thời gian</th>
-                        <th className="px-6 py-4 font-bold">Trạng thái</th>
-                        <th className="px-6 py-4 font-bold text-right">Thao tác</th>
+                        <th className="px-5 py-4 font-bold">Mã</th>
+                        <th className="px-5 py-4 font-bold">Bệnh nhân</th>
+                        <th className="px-5 py-4 font-bold">Bác sĩ / Khoa</th>
+                        <th className="px-5 py-4 font-bold">Thời gian</th>
+                        <th className="px-5 py-4 font-bold">Trạng thái</th>
+                        <th className="px-5 py-4 font-bold text-right">Thao tác</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-50">
-                      {visibleAppointments.map(appt => (
-                        <tr
-                          key={appt.id}
-                          className={`transition hover:bg-slate-50 ${
-                            appt.is_emergency || appt.status === 'EMERGENCY'
-                              ? 'bg-red-50 border-l-4 border-red-500'
-                              : appt.status === 'EMERGENCY_TRANSFER'
-                              ? 'bg-orange-50 border-l-4 border-orange-400'
-                              : ''
-                          }`}
-                        >
-                          <td className="px-6 py-4 font-mono text-sm text-slate-500 font-semibold">
-                            {appt.code}
-                            {appt.is_emergency && <span className="ml-2 text-[10px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded font-bold">CC</span>}
-                          </td>
-                          <td className="px-6 py-4">
-                            <div className="font-bold text-slate-800 flex items-center gap-2">
-                               {appt.patientName} 
-                               {appt.patientDob && <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-medium">{calcAge(appt.patientDob)}T</span>}
-                               {appt.patientGender && <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded font-medium">{appt.patientGender}</span>}
-                            </div>
-                            <div className="text-xs text-slate-400">{appt.phone}</div>
-                          </td>
-                          <td className="px-6 py-4">
-                            <div className="font-semibold">{appt.date}</div>
-                            <div className="text-xs text-slate-400">{appt.time}</div>
-                          </td>
-                          <td className="px-6 py-4">{getStatusBadge(appt.status)}</td>
-                          <td className="px-6 py-4">
-                            <div className="flex items-center justify-end gap-2 flex-wrap">
-                              {PERMS.canUpdateStatus(role) && (
-                                <>
-                                  {/* Thao tác theo flow chuẩn */}
-                                  {appt.status === 'PENDING' && (
-                                    <button onClick={() => handleUpdateStatus(appt.id, 'CONFIRMED')} className="text-xs bg-blue-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-blue-700 transition">
-                                      Xác nhận
-                                    </button>
-                                  )}
-                                  {appt.status === 'CONFIRMED' && (
-                                    <button onClick={() => handleUpdateStatus(appt.id, 'ARRIVED')} className="text-xs bg-indigo-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-indigo-700 transition">
-                                      Đã đến viện
-                                    </button>
-                                  )}
-                                  {appt.status === 'ARRIVED' && role !== 'RECEPTIONIST' && (
-                                    <button onClick={() => handleUpdateStatus(appt.id, 'READY')} className="text-xs bg-teal-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-teal-700 transition">
-                                      Đo sinh hiệu
-                                    </button>
-                                  )}
-                                  {appt.status === 'READY' && PERMS.canExam(role) && (
-                                    <button onClick={() => setExamModal(appt)} className="text-xs bg-green-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-green-700 transition">
-                                      Khám ngay
-                                    </button>
-                                  )}
-
-                                  {/* Cấp cứu: tiếp nhận */}
-                                  {(appt.is_emergency || appt.status === 'EMERGENCY') && role !== 'RECEPTIONIST' && appt.status !== 'TRANSFER_PENDING' && (
-                                    <>
-                                      <button onClick={() => handleUpdateStatus(appt.id, 'ARRIVED')} className="text-xs bg-red-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-red-700 transition">
-                                        Tiếp nhận CC
+                    <tbody className="divide-y divide-slate-100">
+                      {visibleAppointments.map(appt => {
+                        const doc = appt.doctorId ? staffList.find(s => s.id === appt.doctorId) : null;
+                        const dept = appt.deptId ? departments.find(d => d.id === appt.deptId) : null;
+                        return (
+                          <tr
+                            key={appt.id}
+                            className={`transition hover:bg-blue-50/30 ${
+                              appt.is_emergency || appt.status === 'EMERGENCY'
+                                ? 'bg-red-50 border-l-4 border-red-500'
+                                : appt.status === 'TRANSFER_PENDING'
+                                ? 'bg-orange-50 border-l-4 border-orange-400'
+                                : ''
+                            }`}
+                          >
+                            <td className="px-5 py-4 font-mono text-xs text-slate-500 font-semibold">
+                              {appt.code}
+                              {appt.is_emergency && <span className="ml-1.5 text-[10px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded font-bold">CC</span>}
+                            </td>
+                            <td className="px-5 py-4">
+                              <div className="font-bold text-slate-800 flex items-center gap-1.5">
+                                {appt.patientName}
+                                {appt.patientDob && <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-medium">{calcAge(appt.patientDob)}T</span>}
+                                {appt.patientGender && <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded font-medium">{appt.patientGender}</span>}
+                              </div>
+                              <div className="text-xs text-slate-400">{appt.phone}</div>
+                            </td>
+                            <td className="px-5 py-4">
+                              <div className="font-semibold text-slate-700 text-xs">{doc?.name || '---'}</div>
+                              {dept && <div className="text-[11px] text-blue-500 font-medium mt-0.5">{dept.name}</div>}
+                            </td>
+                            <td className="px-5 py-4">
+                              <div className="font-semibold text-slate-700">{appt.date}</div>
+                              <div className="text-xs text-blue-500 font-bold mt-0.5">{appt.time}</div>
+                            </td>
+                            <td className="px-5 py-4">{getStatusBadge(appt.status)}</td>
+                            <td className="px-5 py-4">
+                              <div className="flex items-center justify-end gap-2 flex-wrap">
+                                {PERMS.canUpdateStatus(role) && (
+                                  <>
+                                    {appt.status === 'PENDING' && (
+                                      <button onClick={() => handleUpdateStatus(appt.id, 'CONFIRMED')} className="text-xs bg-blue-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-blue-700 transition">Xác nhận</button>
+                                    )}
+                                    {appt.status === 'CONFIRMED' && (
+                                      <button onClick={() => handleUpdateStatus(appt.id, 'ARRIVED')} className="text-xs bg-indigo-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-indigo-700 transition">Đã đến viện</button>
+                                    )}
+                                    {appt.status === 'ARRIVED' && role !== 'RECEPTIONIST' && (
+                                      <button onClick={() => handleUpdateStatus(appt.id, 'READY')} className="text-xs bg-teal-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-teal-700 transition">Đo sinh hiệu</button>
+                                    )}
+                                    {appt.status === 'READY' && PERMS.canExam(role) && (
+                                      <button onClick={() => setExamModal(appt)} className="text-xs bg-green-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-green-700 transition">Khám ngay</button>
+                                    )}
+                                    {(appt.is_emergency || appt.status === 'EMERGENCY') && role !== 'RECEPTIONIST' && appt.status !== 'TRANSFER_PENDING' && (
+                                      <button onClick={() => handleUpdateStatus(appt.id, 'ARRIVED')} className="text-xs bg-red-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-red-700 transition">Tiếp nhận CC</button>
+                                    )}
+                                    {appt.status === 'TRANSFER_PENDING' && role !== 'RECEPTIONIST' && (
+                                      <button onClick={() => handleUpdateStatus(appt.id, 'READY')} className="text-xs bg-orange-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-orange-700 transition animate-pulse">Tiếp nhận ca chuyển</button>
+                                    )}
+                                    {role === 'DOCTOR' && appt.status !== 'CANCELED' && appt.status !== 'TRANSFER_PENDING' && (
+                                      <button
+                                        onClick={() => { setTransferModal(appt); setTransferTargetDept(''); setTransferReason(''); }}
+                                        className="text-xs bg-orange-500 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-orange-600 transition flex items-center gap-1"
+                                      >
+                                        <ArrowRightLeft size={12}/> Chuyển khoa
                                       </button>
-                                    </>
-                                  )}
-
-                                  {/* Nhận bệnh nhân luân chuyển từ khoa khác */}
-                                  {appt.status === 'TRANSFER_PENDING' && role !== 'RECEPTIONIST' && (
-                                    <button onClick={() => handleUpdateStatus(appt.id, 'READY')} className="text-xs bg-orange-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-orange-700 transition animate-pulse">
-                                      Tiếp nhận ca chuyển
-                                    </button>
-                                  )}
-
-                                  {/* Bất cứ bác sĩ nào cũng chuyển khoa được */}
-                                  {role === 'DOCTOR' && appt.status !== 'CANCELED' && appt.status !== 'TRANSFER_PENDING' && (
-                                    <button
-                                      onClick={() => { setTransferModal(appt); setTransferTargetDept(''); setTransferReason(''); }}
-                                      className="text-xs bg-orange-500 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-orange-600 transition flex items-center gap-1"
-                                    >
-                                      <ArrowRightLeft size={12}/> Chuyển khoa
-                                    </button>
-                                  )}
-
-                                  {/* Hủy — chỉ PENDING */}
-                                  {appt.status === 'PENDING' && (
-                                    <button onClick={() => handleCancelAppointment(appt.id)} className="text-xs text-red-600 border border-red-200 px-3 py-1.5 rounded-lg font-bold hover:bg-red-50 transition">
-                                      Hủy
-                                    </button>
-                                  )}
-                                </>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
+                                    )}
+                                    {appt.status === 'PENDING' && (
+                                      <button onClick={() => handleCancelAppointment(appt.id)} className="text-xs text-red-600 border border-red-200 px-3 py-1.5 rounded-lg font-bold hover:bg-red-50 transition">Hủy</button>
+                                    )}
+                                  </>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
                       {visibleAppointments.length === 0 && (
-                        <tr><td colSpan="5" className="px-6 py-12 text-center text-slate-400">
-                          <Calendar size={32} className="mx-auto mb-3 opacity-30"/>
-                          Chưa có lịch hẹn nào.
+                        <tr><td colSpan="6" className="px-6 py-16 text-center">
+                          <Calendar size={40} className="mx-auto mb-4 text-slate-200"/>
+                          <div className="text-slate-400 font-semibold">Không có lịch hẹn nào phù hợp</div>
+                          <div className="text-slate-300 text-xs mt-1">Thử thay đổi bộ lọc hoặc kiểm tra lại ngày khám</div>
                         </td></tr>
                       )}
                     </tbody>
@@ -909,7 +890,9 @@ const AdminDashboard = () => {
                   onChange={e => setTransferTargetDept(e.target.value)}
                 >
                   <option value="">-- Chọn khoa tiếp nhận --</option>
-                  {departments.map(d => (
+                  {departments
+                    .filter(d => d.id !== transferModal.deptId && d.id !== transferModal.current_department)
+                    .map(d => (
                     <option key={d.id} value={d.id}>{d.name}</option>
                   ))}
                 </select>
