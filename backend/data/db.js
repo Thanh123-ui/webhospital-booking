@@ -39,35 +39,119 @@ if (DB_MODE === 'mock') {
 
   // ── Async API (mock trả về Promise để interface đồng nhất với MySQL) ──────
 
-  /** @returns {Promise<Array>} Danh sách chuyên khoa */
   async function getDepartments()  { return state.mockDepartments; }
-
-  /** @returns {Promise<Array>} Danh sách bác sĩ */
   async function getDoctors()      { return state.mockDoctors; }
-
-  /** @returns {Promise<Array>} Danh sách lịch hẹn */
   async function getAppointments() { return state.appointmentsList; }
-
-  /** @returns {Promise<Array>} Danh sách bệnh nhân */
   async function getPatients()     { return state.patientsList; }
-
-  /** @returns {Promise<Array>} Danh sách lịch làm việc */
   async function getSchedules()    { return state.schedules; }
+  async function getStaff()        { return state.staffList; }
+  async function getRatings()      { return state.ratingsList; }
+  async function getEmergencyTransfers() { return state.emergencyTransfers; }
 
-  // Xuất cả state mutable (cho controllers đọc/ghi trực tiếp như cũ)
-  // VÀ async API mới — cả 2 tồn tại song song để backward-compatible.
+  // ── CRUD async functions (mock mode) ────────────────────────────────────
+
+  async function saveAppointment(appt) {
+    state.appointmentsList.unshift(appt);
+    return appt;
+  }
+
+  async function updateAppointment(id, fields) {
+    const idx = state.appointmentsList.findIndex(a => a.id === id);
+    if (idx === -1) return null;
+    Object.assign(state.appointmentsList[idx], fields);
+    return state.appointmentsList[idx];
+  }
+
+  async function findAppointmentById(id) {
+    return state.appointmentsList.find(a => a.id === id) || null;
+  }
+
+  async function findAppointmentByCode(code, phone) {
+    return state.appointmentsList.find(a => a.code === code && a.phone === phone) || null;
+  }
+
+  async function findPatientByPhone(phone) {
+    return state.patientsList.find(p => p.phone === phone) || null;
+  }
+
+  async function findPatientById(id) {
+    return state.patientsList.find(p => p.id === id) || null;
+  }
+
+  async function addPatient(patient) {
+    state.patientsList.push(patient);
+    return patient;
+  }
+
+  async function updatePatient(id, fields) {
+    const idx = state.patientsList.findIndex(p => p.id === id);
+    if (idx === -1) return null;
+    Object.assign(state.patientsList[idx], fields);
+    return state.patientsList[idx];
+  }
+
+  async function appendMedicalHistory(patientId, record) {
+    const patient = state.patientsList.find(p => p.id === patientId);
+    if (!patient) return null;
+    patient.medicalHistory.unshift(record);
+    return patient;
+  }
+
+  async function findStaffByUsername(username) {
+    return state.staffList.find(s => s.username === username) || null;
+  }
+
+  async function addStaff(staff) {
+    state.staffList.push(staff);
+    return staff;
+  }
+
+  async function updateStaffField(id, fields) {
+    const s = state.staffList.find(s => s.id === id);
+    if (!s) return null;
+    Object.assign(s, fields);
+    return s;
+  }
+
+  async function addRating(rating) {
+    state.ratingsList.push(rating);
+    return rating;
+  }
+
+  async function addLog(entry) {
+    state.logsList.push(entry);
+    return entry;
+  }
+
+  async function addEmergencyTransfer(record) {
+    state.emergencyTransfers.push(record);
+    return record;
+  }
+
+  async function updateScheduleBooked(doctorId, date, time, delta) {
+    const idx = state.schedules.findIndex(
+      s => s.doctorId === doctorId && s.date === date && s.time === time
+    );
+    if (idx !== -1) state.schedules[idx].booked += delta;
+  }
+
+  async function nextAppointmentId() { return state.appointmentsList.length + 1; }
+  async function nextPatientId()     { return state.patientsList.length + 1; }
+  async function nextStaffId()       { return state.staffList.length + 1; }
+
   module.exports = {
-    // ── Direct mutable refs (legacy — controllers hiện tại dùng cách này) ──
+    // ── Direct mutable refs (để backward-compat nếu có chỗ nào còn dùng) ──
     ...state,
 
-    // ── Async query functions (chuẩn mới — dùng cho code mới) ─────────────
-    getDepartments,
-    getDoctors,
-    getAppointments,
-    getPatients,
-    getSchedules,
+    // ── Async query / CRUD functions ────────────────────────────────────────
+    getDepartments, getDoctors, getAppointments, getPatients,
+    getSchedules, getStaff, getRatings, getEmergencyTransfers,
+    saveAppointment, updateAppointment, findAppointmentById, findAppointmentByCode,
+    findPatientByPhone, findPatientById, addPatient, updatePatient, appendMedicalHistory,
+    findStaffByUsername, addStaff, updateStaffField,
+    addRating, addLog, addEmergencyTransfer, updateScheduleBooked,
+    nextAppointmentId, nextPatientId, nextStaffId,
 
-    // Helper: biết đang ở mode nào
     DB_MODE: 'mock',
   };
 
@@ -105,63 +189,196 @@ else if (DB_MODE === 'mysql') {
 
   // ── Async query helpers ─────────────────────────────────────────────────
 
-  /**
-   * Hàm truy vấn chung — dùng nội bộ.
-   * @param {string} sql
-   * @param {Array}  params
-   * @returns {Promise<Array>}
-   */
   async function query(sql, params = []) {
     const [rows] = await pool.execute(sql, params);
     return rows;
   }
 
-  /** @returns {Promise<Array>} */
   async function getDepartments()  { return query('SELECT * FROM departments'); }
-
-  /** @returns {Promise<Array>} */
-  async function getDoctors()      { return query('SELECT * FROM doctors'); }
-
-  /** @returns {Promise<Array>} */
+  async function getDoctors()      { return query('SELECT * FROM staff WHERE role = \'DOCTOR\' AND isActive = 1'); }
   async function getAppointments() { return query('SELECT * FROM appointments ORDER BY id DESC'); }
-
-  /** @returns {Promise<Array>} */
   async function getPatients()     { return query('SELECT * FROM patients'); }
-
-  /** @returns {Promise<Array>} */
   async function getSchedules()    { return query('SELECT * FROM schedules'); }
+  async function getStaff()        { return query('SELECT * FROM staff'); }
+  async function getRatings()      { return query('SELECT * FROM ratings ORDER BY id DESC'); }
+  async function getEmergencyTransfers() { return query('SELECT * FROM emergency_transfers ORDER BY id DESC'); }
 
-  // ── Các biến mutable cần bởi legacy controllers ─────────────────────────
-  // Trong MySQL mode, controllers nên chuyển sang dùng async functions ở trên.
-  // Các ref dưới đây để tránh crash, nhưng SẼ KHÔNG đồng bộ với DB thật.
-  const legacyWarning = (name) => {
-    console.warn(`⚠️  [DB] Truy cập trực tiếp vào "${name}" không hoạt động trong MySQL mode. Hãy dùng async function tương ứng.`);
-    return [];
-  };
+  // ── CRUD functions (MySQL mode) ──────────────────────────────────────────
+
+  async function saveAppointment(appt) {
+    const sql = `INSERT INTO appointments
+      (code, patientId, patientName, phone, doctorId, deptId, \`date\`, \`time\`, status, symptoms, is_emergency, current_department, vitals, history)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`;
+    const historyJson = JSON.stringify(appt.history || []);
+    const [result] = await pool.execute(sql, [
+      appt.code, appt.patientId || null, appt.patientName, appt.phone,
+      appt.doctorId || null, appt.deptId || null, appt.date, appt.time,
+      appt.status, appt.symptoms || '', appt.is_emergency ? 1 : 0,
+      appt.current_department || null, null, historyJson
+    ]);
+    appt.id = result.insertId;
+    return appt;
+  }
+
+  async function updateAppointment(id, fields) {
+    const allowed = ['status','doctorId','deptId','date','time','vitals','history','current_department'];
+    const sets = [];
+    const vals = [];
+    for (const [k, v] of Object.entries(fields)) {
+      if (!allowed.includes(k)) continue;
+      sets.push(`\`${k}\` = ?`);
+      vals.push((k === 'vitals' || k === 'history') ? JSON.stringify(v) : v);
+    }
+    if (!sets.length) return findAppointmentById(id);
+    await pool.execute(`UPDATE appointments SET ${sets.join(', ')} WHERE id = ?`, [...vals, id]);
+    return findAppointmentById(id);
+  }
+
+  async function findAppointmentById(id) {
+    const rows = await query('SELECT * FROM appointments WHERE id = ?', [id]);
+    if (!rows[0]) return null;
+    const a = rows[0];
+    if (typeof a.history === 'string') try { a.history = JSON.parse(a.history); } catch { a.history = []; }
+    if (typeof a.vitals === 'string')  try { a.vitals  = JSON.parse(a.vitals);  } catch { a.vitals  = null; }
+    return a;
+  }
+
+  async function findAppointmentByCode(code, phone) {
+    const rows = await query('SELECT * FROM appointments WHERE code = ? AND phone = ?', [code, phone]);
+    return rows[0] || null;
+  }
+
+  async function findPatientByPhone(phone) {
+    const rows = await query('SELECT * FROM patients WHERE phone = ?', [phone]);
+    if (!rows[0]) return null;
+    const p = rows[0];
+    if (typeof p.medicalHistory === 'string') try { p.medicalHistory = JSON.parse(p.medicalHistory); } catch { p.medicalHistory = []; }
+    return p;
+  }
+
+  async function findPatientById(id) {
+    const rows = await query('SELECT * FROM patients WHERE id = ?', [id]);
+    if (!rows[0]) return null;
+    const p = rows[0];
+    if (typeof p.medicalHistory === 'string') try { p.medicalHistory = JSON.parse(p.medicalHistory); } catch { p.medicalHistory = []; }
+    return p;
+  }
+
+  async function addPatient(patient) {
+    const sql = `INSERT INTO patients (patientCode, cccd, name, phone, email, password, gender, dob, address, medicalHistory)
+      VALUES (?,?,?,?,?,?,?,?,?,?)`;
+    const [result] = await pool.execute(sql, [
+      patient.patientCode, patient.cccd || '', patient.name, patient.phone,
+      patient.email || '', patient.password, patient.gender || 'Unknown',
+      patient.dob || null, patient.address || '', JSON.stringify([])
+    ]);
+    patient.id = result.insertId;
+    return patient;
+  }
+
+  async function updatePatient(id, fields) {
+    const allowed = ['cccd','dob','gender'];
+    const sets = []; const vals = [];
+    for (const [k, v] of Object.entries(fields)) {
+      if (allowed.includes(k) && v !== undefined) { sets.push(`\`${k}\` = ?`); vals.push(v); }
+    }
+    if (sets.length) await pool.execute(`UPDATE patients SET ${sets.join(', ')} WHERE id = ?`, [...vals, id]);
+    return findPatientById(id);
+  }
+
+  async function appendMedicalHistory(patientId, record) {
+    const patient = await findPatientById(patientId);
+    if (!patient) return null;
+    const history = Array.isArray(patient.medicalHistory) ? patient.medicalHistory : [];
+    history.unshift(record);
+    await pool.execute('UPDATE patients SET medicalHistory = ? WHERE id = ?', [JSON.stringify(history), patientId]);
+    patient.medicalHistory = history;
+    return patient;
+  }
+
+  async function findStaffByUsername(username) {
+    const rows = await query('SELECT * FROM staff WHERE username = ?', [username]);
+    return rows[0] || null;
+  }
+
+  async function addStaff(staff) {
+    const sql = `INSERT INTO staff (deptId, name, title, avatar, role, isActive, username, password)
+      VALUES (?,?,?,?,?,?,?,?)`;
+    const [result] = await pool.execute(sql, [
+      staff.deptId || null, staff.name, staff.title || '', staff.avatar || '👤',
+      staff.role, staff.isActive ? 1 : 0, staff.username, staff.password
+    ]);
+    staff.id = result.insertId;
+    return staff;
+  }
+
+  async function updateStaffField(id, fields) {
+    const allowed = ['role','isActive','password','deptId','name','title'];
+    const sets = []; const vals = [];
+    for (const [k, v] of Object.entries(fields)) {
+      if (allowed.includes(k)) { sets.push(`\`${k}\` = ?`); vals.push(v); }
+    }
+    if (!sets.length) return null;
+    await pool.execute(`UPDATE staff SET ${sets.join(', ')} WHERE id = ?`, [...vals, id]);
+    const rows = await query('SELECT * FROM staff WHERE id = ?', [id]);
+    return rows[0] || null;
+  }
+
+  async function addRating(rating) {
+    await pool.execute(
+      'INSERT INTO ratings (apptId, doctorName, rating, comment, \`date\`) VALUES (?,?,?,?,?)',
+      [rating.apptId || null, rating.doctorName, rating.rating, rating.comment || '', rating.date]
+    );
+    return rating;
+  }
+
+  async function addLog(entry) {
+    await pool.execute('INSERT INTO logs (\`date\`, action, \`by\`) VALUES (?,?,?)', [entry.date, entry.action, entry.by]);
+    return entry;
+  }
+
+  async function addEmergencyTransfer(record) {
+    const sql = `INSERT INTO emergency_transfers
+      (appointmentId, appointmentCode, patientId, patientName, fromDeptId, fromDeptName, toDeptId, toDeptName, reason, transferredBy, transferredByName, transferredAt)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`;
+    const [result] = await pool.execute(sql, [
+      record.appointmentId, record.appointmentCode, record.patientId, record.patientName,
+      record.fromDeptId || null, record.fromDeptName, record.toDeptId, record.toDeptName,
+      record.reason || '', record.transferredBy, record.transferredByName || '', record.transferredAt
+    ]);
+    record.id = result.insertId;
+    return record;
+  }
+
+  async function updateScheduleBooked(doctorId, date, time, delta) {
+    await pool.execute(
+      'UPDATE schedules SET booked = booked + ? WHERE doctorId = ? AND `date` = ? AND `time` = ?',
+      [delta, doctorId, date, time]
+    );
+  }
+
+  async function nextAppointmentId() {
+    const rows = await query('SELECT MAX(id) AS mx FROM appointments');
+    return (rows[0]?.mx || 0) + 1;
+  }
+  async function nextPatientId() {
+    const rows = await query('SELECT MAX(id) AS mx FROM patients');
+    return (rows[0]?.mx || 0) + 1;
+  }
+  async function nextStaffId() {
+    const rows = await query('SELECT MAX(id) AS mx FROM staff');
+    return (rows[0]?.mx || 0) + 1;
+  }
 
   module.exports = {
-    // ── Async functions (nên dùng) ─────────────────────────────────────────
-    getDepartments,
-    getDoctors,
-    getAppointments,
-    getPatients,
-    getSchedules,
-
-    // ── pool — dành cho controllers cần query tuỳ chỉnh ───────────────────
-    pool,
-    query,
-
-    // ── Stub cho legacy controllers (in ra warning khi dùng) ──────────────
-    get mockDepartments()  { return legacyWarning('mockDepartments');  },
-    get mockDoctors()      { return legacyWarning('mockDoctors');      },
-    get schedules()        { return legacyWarning('schedules');        },
-    get staffList()        { return legacyWarning('staffList');        },
-    get patientsList()     { return legacyWarning('patientsList');     },
-    get appointmentsList() { return legacyWarning('appointmentsList'); },
-    get logsList()         { return legacyWarning('logsList');         },
-    get ratingsList()      { return legacyWarning('ratingsList');      },
-    get emergencyTransfers(){ return legacyWarning('emergencyTransfers'); },
-
+    getDepartments, getDoctors, getAppointments, getPatients,
+    getSchedules, getStaff, getRatings, getEmergencyTransfers,
+    saveAppointment, updateAppointment, findAppointmentById, findAppointmentByCode,
+    findPatientByPhone, findPatientById, addPatient, updatePatient, appendMedicalHistory,
+    findStaffByUsername, addStaff, updateStaffField,
+    addRating, addLog, addEmergencyTransfer, updateScheduleBooked,
+    nextAppointmentId, nextPatientId, nextStaffId,
+    pool, query,
     DB_MODE: 'mysql',
   };
 }

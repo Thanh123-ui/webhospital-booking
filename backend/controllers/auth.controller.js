@@ -11,33 +11,41 @@ const generateTokens = (userPayload) => {
     return { accessToken, refreshToken };
 };
 
-exports.patientLogin = (req, res) => {
-  const { phone, password } = req.body;
-  const patient = db.patientsList.find(p => p.phone === phone && p.password === password);
-  if (patient) {
-    const tokens = generateTokens({ id: patient.id, role: 'PATIENT' });
-    res.json({ success: true, user: patient, ...tokens });
-  } else {
-    res.status(401).json({ success: false, message: 'Số điện thoại hoặc mật khẩu không đúng!' });
-  }
+exports.patientLogin = async (req, res) => {
+    try {
+        const { phone, password } = req.body;
+        const patient = await db.findPatientByPhone(phone);
+        if (patient && patient.password === password) {
+            const tokens = generateTokens({ id: patient.id, role: 'PATIENT' });
+            res.json({ success: true, user: patient, ...tokens });
+        } else {
+            res.status(401).json({ success: false, message: 'Số điện thoại hoặc mật khẩu không đúng!' });
+        }
+    } catch (err) {
+        res.status(500).json({ success: false, message: 'Lỗi server', error: err.message });
+    }
 };
 
-exports.staffLogin = (req, res) => {
-    const username = (req.body.username || '').trim();
-    const password = (req.body.password || '').trim();
-    const staff = db.staffList.find(s => s.username === username && s.password === password);
-    if (!staff) {
-        return res.status(401).json({ success: false, message: 'Tài khoản hoặc mật khẩu không chính xác.' });
-    }
-    if (!staff.isActive) {
-        return res.status(403).json({ success: false, message: 'Tài khoản của bạn đã bị vô hiệu hóa. Vui lòng liên hệ Admin.' });
-    }
-    const tokens = generateTokens({ id: staff.id, role: staff.role });
-    
-    // Thu thập log vào File
-    writeLog('Đăng nhập hệ thống (JWT)', staff.name);
+exports.staffLogin = async (req, res) => {
+    try {
+        const username = (req.body.username || '').trim();
+        const password = (req.body.password || '').trim();
+        const staff = await db.findStaffByUsername(username);
+        if (!staff || staff.password !== password) {
+            return res.status(401).json({ success: false, message: 'Tài khoản hoặc mật khẩu không chính xác.' });
+        }
+        if (!staff.isActive) {
+            return res.status(403).json({ success: false, message: 'Tài khoản của bạn đã bị vô hiệu hóa. Vui lòng liên hệ Admin.' });
+        }
+        const tokens = generateTokens({ id: staff.id, role: staff.role });
 
-    res.json({ success: true, user: staff, ...tokens });
+        // Thu thập log vào File
+        writeLog('Đăng nhập hệ thống (JWT)', staff.name);
+
+        res.json({ success: true, user: staff, ...tokens });
+    } catch (err) {
+        res.status(500).json({ success: false, message: 'Lỗi server', error: err.message });
+    }
 };
 
 exports.refreshToken = (req, res) => {
