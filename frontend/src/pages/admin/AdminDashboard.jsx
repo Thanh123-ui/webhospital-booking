@@ -18,7 +18,7 @@ import { getStatusBadge, getRoleConfig } from '../../utils/helpers';
 // RECEPTIONIST : Appointments only (view/confirm/arrived)
 // ─────────────────────────────────────────────────────────────────────────────
 const PERMS = {
-  canViewPatients:  (r) => ['ADMIN','BOD','DOCTOR'].includes(r),
+  canViewPatients:  (r) => ['ADMIN','BOD','DOCTOR','RECEPTIONIST'].includes(r),
   canViewMedical:   (r) => ['ADMIN','BOD','DOCTOR'].includes(r),
   canViewStaff:     (r) => ['ADMIN','BOD'].includes(r),
   canAddStaff:      (r) => ['ADMIN'].includes(r),
@@ -55,7 +55,7 @@ const AdminDashboard = () => {
   const [staffList, setStaffList] = useState([]);
   const [logsList, setLogsList] = useState([]);
 
-  const [newStaff, setNewStaff] = useState({ name: '', username: '', password: '', role: 'DOCTOR', title: '', deptId: '' });
+  const [newStaff, setNewStaff] = useState({ name: '', username: '', password: '', role: 'DOCTOR', title: '', deptId: '', exp: '' });
   const [examModal, setExamModal] = useState(null);
   const [recordData, setRecordData] = useState({ diagnosis: '', prescription: '', notes: '' });
   const [transferModal, setTransferModal] = useState(null); // { appt }
@@ -67,6 +67,10 @@ const AdminDashboard = () => {
   const [selectedPatient, setSelectedPatient] = useState(null);
   const [patientDetailModal, setPatientDetailModal] = useState(false);
   const [showNewPass, setShowNewPass] = useState(false);
+
+  // Vitals modal — Điều dưỡng đo sinh hiệu
+  const [vitalsModal, setVitalsModal] = useState(null); // appt object
+  const [vitalsData, setVitalsData] = useState({ bloodPressure: '', heartRate: '', temperature: '', weight: '', height: '', spO2: '', notes: '' });
 
   // New features state
   const [staffSearchQuery, setStaffSearchQuery] = useState('');
@@ -147,9 +151,21 @@ const AdminDashboard = () => {
     try {
       await api.addStaff(newStaff);
       showToast('✅ Tạo tài khoản thành công!');
-      setNewStaff({ name: '', username: '', password: '', role: 'DOCTOR', title: '', deptId: '' });
+      setNewStaff({ name: '', username: '', password: '', role: 'DOCTOR', title: '', deptId: '', exp: '' });
       fetchStaff();
     } catch (err) { alert(err.response?.data?.message || 'Lỗi khi thêm nhân sự'); }
+  };
+
+  const handleSaveVitals = async (e) => {
+    e.preventDefault();
+    if (!vitalsModal) return;
+    try {
+      await api.saveVitals(vitalsModal.id, { vitals: vitalsData, role, staffId: currentStaffUser.id });
+      setVitalsModal(null);
+      setVitalsData({ bloodPressure: '', heartRate: '', temperature: '', weight: '', height: '', spO2: '', notes: '' });
+      fetchAppointments();
+      showToast('✅ Đã lưu sinh hiệu! Bệnh nhân sẵn sàng khám.');
+    } catch (err) { alert(err.response?.data?.message || 'Lỗi khi lưu sinh hiệu!'); }
   };
 
   const handleToggleStaff = async (id) => {
@@ -459,8 +475,8 @@ const AdminDashboard = () => {
                                     {appt.status === 'CONFIRMED' && (
                                       <button onClick={() => handleUpdateStatus(appt.id, 'ARRIVED')} className="text-xs bg-indigo-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-indigo-700 transition">Đã đến viện</button>
                                     )}
-                                    {appt.status === 'ARRIVED' && role !== 'RECEPTIONIST' && (
-                                      <button onClick={() => handleUpdateStatus(appt.id, 'READY')} className="text-xs bg-teal-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-teal-700 transition">Đo sinh hiệu</button>
+                                    {appt.status === 'ARRIVED' && role === 'NURSE' && (
+                                      <button onClick={() => { setVitalsModal(appt); setVitalsData({ bloodPressure: '', heartRate: '', temperature: '', weight: '', height: '', spO2: '', notes: '' }); }} className="text-xs bg-teal-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-teal-700 transition">Đo Sinh Hiệu</button>
                                     )}
                                     {appt.status === 'READY' && PERMS.canExam(role) && (
                                       <button onClick={() => setExamModal(appt)} className="text-xs bg-green-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-green-700 transition">Khám ngay</button>
@@ -471,7 +487,7 @@ const AdminDashboard = () => {
                                     {appt.status === 'TRANSFER_PENDING' && role !== 'RECEPTIONIST' && (
                                       <button onClick={() => handleUpdateStatus(appt.id, 'READY')} className="text-xs bg-orange-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-orange-700 transition animate-pulse">Tiếp nhận ca chuyển</button>
                                     )}
-                                    {role === 'DOCTOR' && appt.status !== 'CANCELED' && appt.status !== 'TRANSFER_PENDING' && (
+                                    {role === 'DOCTOR' && appt.status !== 'CANCELED' && appt.status !== 'COMPLETED' && appt.status !== 'TRANSFER_PENDING' && (
                                       <button
                                         onClick={() => { setTransferModal(appt); setTransferTargetDept(''); setTransferReason(''); }}
                                         className="text-xs bg-orange-500 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-orange-600 transition flex items-center gap-1"
@@ -604,6 +620,12 @@ const AdminDashboard = () => {
                           <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">Chức danh</label>
                           <input required type="text" className="w-full p-3 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none" value={newStaff.title} onChange={e => setNewStaff({...newStaff, title: e.target.value})} placeholder="VD: Thạc sĩ, Bác sĩ CKI" />
                         </div>
+                        {(newStaff.role === 'DOCTOR') && (
+                          <div>
+                            <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">Kinh nghiệm</label>
+                            <input type="text" className="w-full p-3 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none" value={newStaff.exp} onChange={e => setNewStaff({...newStaff, exp: e.target.value})} placeholder="VD: 10 năm" />
+                          </div>
+                        )}
                         <div>
                           <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">Vai trò</label>
                           <select className="w-full p-3 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none" value={newStaff.role} onChange={e => setNewStaff({...newStaff, role: e.target.value, deptId: ''})}>
@@ -786,6 +808,67 @@ const AdminDashboard = () => {
         </div>
       </main>
 
+      {/* ── VITALS MODAL (Điều dưỡng đo sinh hiệu) ── */}
+      {vitalsModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg flex flex-col max-h-[90vh] overflow-hidden">
+            <div className="px-6 py-5 bg-gradient-to-r from-teal-700 to-teal-600 text-white flex justify-between items-center shrink-0">
+              <h2 className="text-lg font-black flex items-center gap-2">🩺 Đo Sinh Hiệu Bệnh Nhân</h2>
+              <button onClick={() => setVitalsModal(null)} className="text-white/70 hover:text-white font-bold text-2xl leading-none">&times;</button>
+            </div>
+            <div className="px-6 py-3 bg-teal-50 border-b border-teal-100 text-sm shrink-0">
+              <div className="font-bold text-teal-800">👤 {vitalsModal.patientName}</div>
+              <div className="text-teal-600 text-xs mt-0.5">Mã: {vitalsModal.code} — {vitalsModal.phone}</div>
+            </div>
+            <form onSubmit={handleSaveVitals} className="p-6 overflow-y-auto flex-1 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">Huyết áp (mmHg)</label>
+                  <input type="text" className="w-full p-3 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-teal-500 outline-none"
+                    value={vitalsData.bloodPressure} onChange={e => setVitalsData({...vitalsData, bloodPressure: e.target.value})} placeholder="VD: 120/80" />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">Nhịp tim (lần/phút)</label>
+                  <input type="number" className="w-full p-3 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-teal-500 outline-none"
+                    value={vitalsData.heartRate} onChange={e => setVitalsData({...vitalsData, heartRate: e.target.value})} placeholder="VD: 72" />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">Nhiệt độ (°C)</label>
+                  <input type="number" step="0.1" className="w-full p-3 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-teal-500 outline-none"
+                    value={vitalsData.temperature} onChange={e => setVitalsData({...vitalsData, temperature: e.target.value})} placeholder="VD: 37.0" />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">SpO2 (%)</label>
+                  <input type="number" step="0.1" className="w-full p-3 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-teal-500 outline-none"
+                    value={vitalsData.spO2} onChange={e => setVitalsData({...vitalsData, spO2: e.target.value})} placeholder="VD: 98.5" />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">Cân nặng (kg)</label>
+                  <input type="number" step="0.1" className="w-full p-3 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-teal-500 outline-none"
+                    value={vitalsData.weight} onChange={e => setVitalsData({...vitalsData, weight: e.target.value})} placeholder="VD: 65.0" />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">Chiều cao (cm)</label>
+                  <input type="number" step="0.1" className="w-full p-3 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-teal-500 outline-none"
+                    value={vitalsData.height} onChange={e => setVitalsData({...vitalsData, height: e.target.value})} placeholder="VD: 170" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">Ghi chú thêm</label>
+                <textarea rows="2" className="w-full p-3 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-teal-500 resize-none"
+                  value={vitalsData.notes} onChange={e => setVitalsData({...vitalsData, notes: e.target.value})} placeholder="Ghi chú thêm cho bác sĩ..."></textarea>
+              </div>
+              <div className="flex justify-end gap-3 pt-2 border-t border-slate-100">
+                <button type="button" onClick={() => setVitalsModal(null)} className="px-5 py-2.5 rounded-xl font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition text-sm">Hủy bỏ</button>
+                <button type="submit" className="px-5 py-2.5 rounded-xl font-bold bg-teal-600 text-white hover:bg-teal-700 transition flex items-center gap-2 text-sm">
+                  <Check size={16}/> Lưu & Chuyển Bác sĩ
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* ── EXAM MODAL ── */}
       {examModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
@@ -898,8 +981,9 @@ const AdminDashboard = () => {
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">Lý do chuyển khoa</label>
+                <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">Lý do chuyển khoa <span className="text-red-500">*</span></label>
                 <textarea
+                  required
                   rows="3"
                   className="w-full p-3 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-orange-500 resize-none"
                   value={transferReason}

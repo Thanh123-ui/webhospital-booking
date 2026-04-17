@@ -139,6 +139,16 @@ if (DB_MODE === 'mock') {
   async function nextPatientId()     { return state.patientsList.length + 1; }
   async function nextStaffId()       { return state.staffList.length + 1; }
 
+  // Vitals — lưu sinh hiệu (mock mode dùng Map trong bộ nhớ)
+  const vitalsStore = new Map();
+  async function saveVitals(data) {
+    vitalsStore.set(data.appointmentId, { ...data, recordedAt: new Date().toISOString() });
+    return data;
+  }
+  async function getVitalsByAppointmentId(appointmentId) {
+    return vitalsStore.get(appointmentId) || null;
+  }
+
   module.exports = {
     // ── Direct mutable refs (để backward-compat nếu có chỗ nào còn dùng) ──
     ...state,
@@ -151,6 +161,7 @@ if (DB_MODE === 'mock') {
     findStaffByUsername, addStaff, updateStaffField,
     addRating, addLog, addEmergencyTransfer, updateScheduleBooked,
     nextAppointmentId, nextPatientId, nextStaffId,
+    saveVitals, getVitalsByAppointmentId,
 
     DB_MODE: 'mock',
   };
@@ -170,9 +181,11 @@ else if (DB_MODE === 'mysql') {
     user:     process.env.DB_USER     || 'root',
     password: process.env.DB_PASSWORD || '',
     database: process.env.DB_NAME     || 'hospital',
+    charset:  'utf8mb4',
     waitForConnections: true,
     connectionLimit:    10,
     queueLimit:         0,
+    multipleStatements: true,
   });
 
   // Kiểm tra kết nối ngay khi khởi động
@@ -186,6 +199,57 @@ else if (DB_MODE === 'mysql') {
       console.error('    Kiểm tra lại DB_HOST, DB_USER, DB_PASSWORD, DB_NAME trong file .env');
       process.exit(1); // Dừng server nếu DB không kết nối được
     });
+
+  // ── TỰ ĐỘNG TẠO SCHEMA nếu DB trống ─────────────────────────────────────
+  async function initDatabase() {
+    try {
+      const path = require('path');
+      const fs = require('fs');
+      const rows = await query(`SELECT COUNT(*) AS cnt FROM information_schema.tables WHERE table_schema = ? AND table_name = 'departments'`, [process.env.DB_NAME || 'hospital']);
+      if (rows[0].cnt > 0) {
+        console.log('ℹ️  [DB] Schema đã tồn tại, bỏ qua việc tạo mới.');
+        return;
+      }
+      console.log('🔧 [DB] Database trống, đang tự tạo schema từ schema.sql...');
+      const schemaPath = path.join(__dirname, '..', '..', 'schema.sql');
+      const sql = fs.readFileSync(schemaPath, 'utf8');
+      await pool.query(sql);
+      console.log('✅  [DB] Tạo schema và seed data thành công!');
+    } catch (err) {
+      console.error('❌  [DB] Lỗi khi tạo schema:', err.message);
+    }
+  }
+
+  // ── TỰ SINH LỊCH KHÁM 7 NGÀY nếu bảng schedules trống ─────────────────
+  async function generateSchedulesIfEmpty() {
+    try {
+      const rows = await query('SELECT COUNT(*) AS cnt FROM schedules');
+      if (rows[0].cnt > 0) return;
+      console.log('🔧 [DB] Bảng schedules trống, đang tự sinh lịch 7 ngày...');
+      const doctors = await query("SELECT id FROM staff WHERE role = 'DOCTOR' AND isActive = 1");
+      if (!doctors.length) return;
+      const slots = [];
+      const push = (startMin, count) => { for (let i = 0; i < count; i++) { const m = startMin + i * 35; slots.push(`${String(Math.floor(m/60)).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`); } };
+      push(7*60, 8); push(13*60, 7);
+      const today = new Date();
+      const inserts = [];
+      for (let i = 0; i < 7; i++) {
+        const d = new Date(today); d.setDate(today.getDate() + i);
+        const dateStr = d.toISOString().split('T')[0];
+        for (const doc of doctors) {
+          for (const time of slots) {
+            if (Math.random() > 0.1) inserts.push([doc.id, dateStr, time, 2, 0]);
+          }
+        }
+      }
+      if (inserts.length > 0) {
+        await pool.query('INSERT INTO schedules (doctorId, `date`, `time`, maxPatients, booked) VALUES ?', [inserts]);
+      }
+      console.log(`✅  [DB] Đã sinh ${inserts.length} lịch khám cho bác sĩ.`);
+    } catch (err) {
+      console.error('❌  [DB] Lỗi khi sinh lịch:', err.message);
+    }
+  }
 
   // ── Async query helpers ─────────────────────────────────────────────────
 
@@ -357,6 +421,28 @@ else if (DB_MODE === 'mysql') {
     );
   }
 
+  // ── VITALS (sinh hiệu — bảng riêng) ──────────────────────────────────────────
+  async function saveVitals(data) {
+    const sql = `INSERT INTO vitals
+      (appointmentId, bloodPressure, heartRate, temperature, weight, height, spO2, notes, recordedBy)
+      VALUES (?,?,?,?,?,?,?,?,?)
+      ON DUPLICATE KEY UPDATE
+      bloodPressure=VALUES(bloodPressure), heartRate=VALUES(heartRate),
+      temperature=VALUES(temperature), weight=VALUES(weight), height=VALUES(height),
+      spO2=VALUES(spO2), notes=VALUES(notes), recordedBy=VALUES(recordedBy), recordedAt=NOW()`;
+    await pool.execute(sql, [
+      data.appointmentId, data.bloodPressure || null, data.heartRate || null,
+      data.temperature || null, data.weight || null, data.height || null,
+      data.spO2 || null, data.notes || '', data.recordedBy || null
+    ]);
+    return data;
+  }
+
+  async function getVitalsByAppointmentId(appointmentId) {
+    const rows = await query('SELECT * FROM vitals WHERE appointmentId = ?', [appointmentId]);
+    return rows[0] || null;
+  }
+
   async function nextAppointmentId() {
     const rows = await query('SELECT MAX(id) AS mx FROM appointments');
     return (rows[0]?.mx || 0) + 1;
@@ -378,6 +464,8 @@ else if (DB_MODE === 'mysql') {
     findStaffByUsername, addStaff, updateStaffField,
     addRating, addLog, addEmergencyTransfer, updateScheduleBooked,
     nextAppointmentId, nextPatientId, nextStaffId,
+    saveVitals, getVitalsByAppointmentId,
+    initDatabase, generateSchedulesIfEmpty,
     pool, query,
     DB_MODE: 'mysql',
   };

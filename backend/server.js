@@ -41,6 +41,12 @@ io.on('connection', (socket) => {
 });
 
 // Khởi chạy Server qua http.createServer
-server.listen(PORT, () => {
+server.listen(PORT, async () => {
   console.log(`Backend Server + Socket.IO đang chạy tại http://localhost:${PORT}`);
+  // Tự động khởi tạo DB và sinh lịch nếu đang dùng MySQL
+  const db = require('./data/db');
+  if (db.DB_MODE === 'mysql') {
+    await db.initDatabase();
+    await db.generateSchedulesIfEmpty();
+  }
 });

@@ -127,7 +127,7 @@ const PatientHome = () => {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {departments.map(dept => (
+          {departments.filter(dept => !dept.isEmergency).map(dept => (
                 <div key={dept.id} className="group bg-white rounded-2xl shadow-sm border border-slate-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 overflow-hidden cursor-pointer" onClick={() => navigate(`/book?dept=${dept.id}`)}>
                   <div className="h-2 bg-gradient-to-r from-blue-600 to-teal-500 group-hover:from-teal-500 group-hover:to-blue-600 transition-all"></div>
                   <div className="p-7">

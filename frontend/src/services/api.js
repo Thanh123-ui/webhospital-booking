@@ -26,6 +26,7 @@ export const api = {
   createAppointment: (data) => apiClient.post('/appointments', data),
   updateAppointmentStatus: (id, statusData) => apiClient.put(`/appointments/${id}/status`, statusData),
   addVitals: (id, vitalsData) => apiClient.put(`/appointments/${id}/vitals`, vitalsData),
+  saveVitals: (id, vitalsData) => apiClient.put(`/appointments/${id}/vitals`, vitalsData),
   completeMedicalRecord: (id, recordData) => apiClient.put(`/appointments/${id}/complete`, recordData),
   rescheduleAppointment: (id, data) => apiClient.put(`/appointments/${id}/reschedule`, data),
   cancelAppointment: (id, data) => apiClient.put(`/appointments/${id}/cancel`, data),

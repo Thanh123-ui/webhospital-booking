@@ -76,6 +76,7 @@ const BookingWizard = () => {
         dob: bookingData.dob,
         gender: bookingData.gender,
         doctorId: bookingData.doctorId, 
+        deptId: bookingData.dept,
         date: bookingData.date, 
         time: bookingData.time, 
         symptoms: bookingData.symptoms, 

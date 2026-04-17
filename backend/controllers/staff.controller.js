@@ -30,13 +30,16 @@ exports.addStaff = async (req, res) => {
 
         const avatarMap = { BOD: '👔', DOCTOR: '👨‍⚕️', NURSE: '👩‍⚕️', RECEPTIONIST: '👩‍💼', ADMIN: '🧑‍💻' };
 
+        const parsedDeptId = (data.deptId && !isNaN(parseInt(data.deptId))) ? parseInt(data.deptId) : null;
+
         const nextId = await db.nextStaffId();
         const newStaff = {
             id: nextId,
             name: data.name,
             role: data.role,
             title: data.title,
-            deptId: (data.role === 'DOCTOR' || data.role === 'NURSE') ? parseInt(data.deptId) : null,
+            exp: data.exp || null,
+            deptId: (data.role === 'DOCTOR' || data.role === 'NURSE') ? parsedDeptId : null,
             avatar: avatarMap[data.role] || '👤',
             isActive: true,
             username: data.username,

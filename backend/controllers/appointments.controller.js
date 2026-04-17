@@ -208,19 +208,35 @@ exports.updateStatus = async (req, res) => {
 exports.updateVitals = async (req, res) => {
     try {
         const { id } = req.params;
-        const { vitals, role } = req.body;
+        const { vitals, role, staffId } = req.body;
 
         const appt = await db.findAppointmentById(parseInt(id));
         if (!appt) return res.status(404).json({ message: 'Not found' });
 
+        // Lưu sinh hiệu vào bảng vitals riêng
+        if (db.saveVitals) {
+            await db.saveVitals({
+                appointmentId: parseInt(id),
+                bloodPressure: vitals.bloodPressure,
+                heartRate: vitals.heartRate ? parseInt(vitals.heartRate) : null,
+                temperature: vitals.temperature ? parseFloat(vitals.temperature) : null,
+                weight: vitals.weight ? parseFloat(vitals.weight) : null,
+                height: vitals.height ? parseFloat(vitals.height) : null,
+                spO2: vitals.spO2 ? parseFloat(vitals.spO2) : null,
+                notes: vitals.notes || '',
+                recordedBy: staffId ? parseInt(staffId) : null,
+            });
+        }
+
         const history = Array.isArray(appt.history) ? appt.history : [];
         history.push({
             date: new Date().toISOString(),
-            action: 'Điều dưỡng đã đo sinh hiệu',
+            action: 'Điều dưỡng đã đo sinh hiệu và chuyển cho bác sĩ',
             by: role
         });
 
-        const updated = await db.updateAppointment(parseInt(id), { status: 'READY', vitals, history });
+        // Chuyển trạng thái sang READY (chờ bác sĩ khám)
+        const updated = await db.updateAppointment(parseInt(id), { status: 'READY', history });
 
         res.json(updated);
     } catch (err) {
@@ -364,6 +380,11 @@ exports.transferPatient = async (req, res) => {
 
         const appt = await db.findAppointmentById(parseInt(id));
         if (!appt) return res.status(404).json({ message: 'Không tìm thấy hồ sơ.' });
+
+        // Cấm chuyển khoa nếu đã COMPLETED
+        if (appt.status === 'COMPLETED') {
+            return res.status(400).json({ message: 'Không thể chuyển khoa vì hồ sơ này đã được khám xong và đóng lại.' });
+        }
 
         // Cho phép mọi hồ sơ kể cả khám thường & cấp cứu đều được chuyển khoa.
         const departments = await db.getDepartments();

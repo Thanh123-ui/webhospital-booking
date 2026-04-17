@@ -61,7 +61,6 @@ CREATE TABLE IF NOT EXISTS appointments (
   symptoms TEXT,
   is_emergency BOOLEAN DEFAULT FALSE,
   current_department INT NULL,
-  vitals JSON,
   history JSON,
   createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (patientId) REFERENCES patients(id) ON DELETE SET NULL,
@@ -153,3 +152,52 @@ INSERT IGNORE INTO staff (id, deptId, name, title, avatar, exp, role, isActive, 
 INSERT IGNORE INTO patients (id, patientCode, cccd, name, phone, email, password, gender, dob, address, medicalHistory) VALUES
 (1, 'BN-10001', '079012345678', 'Nguyễn Văn A', '0901234567', 'nguyenvana@gmail.com', 'pass@2024', 'Nam', '1980-05-12', 'Quận 1, TP.HCM', '[]'),
 (2, 'BN-10002', '079088888888', 'Trần Thị B', '0988888888', 'tranthib@gmail.com', 'pass@2025', 'Nữ', '1995-08-20', 'Quận 3, TP.HCM', '[]');
+
+
+-- ==============================================================================
+-- CÁC BẢNG MỞ RỘNG
+-- ==============================================================================
+
+-- 9. BẢNG SINH HIỆU (do Điều dưỡng ghi sau khi bệnh nhân đến khoa)
+CREATE TABLE IF NOT EXISTS vitals (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  appointmentId INT NOT NULL UNIQUE,
+  bloodPressure VARCHAR(20),           -- Huyết áp VD: "120/80"
+  heartRate INT,                       -- Nhịp tim (lần/phút)
+  temperature DECIMAL(4,1),            -- Nhiệt độ (°C)
+  weight DECIMAL(5,1),                 -- Cân nặng (kg)
+  height DECIMAL(5,1),                 -- Chiều cao (cm)
+  spO2 DECIMAL(5,1),                   -- Độ bão hòa oxy (%)
+  notes TEXT,                          -- Ghi chú thêm của điều dưỡng
+  recordedBy INT NULL,                 -- ID điều dưỡng thực hiện đo
+  recordedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (appointmentId) REFERENCES appointments(id) ON DELETE CASCADE,
+  FOREIGN KEY (recordedBy) REFERENCES staff(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 10. BẢNG THÔNG TIN BỆNH VIỆN
+CREATE TABLE IF NOT EXISTS hospital_booking (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  hospitalName VARCHAR(255) NOT NULL DEFAULT 'ClinicCare',
+  address TEXT,
+  hotline VARCHAR(50),
+  email VARCHAR(150),
+  workingHours VARCHAR(255),
+  updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 11. BẢNG NGƯỜI DÙNG (tách biệt hoàn toàn với bảng staff/admin)
+CREATE TABLE IF NOT EXISTS users (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  username VARCHAR(100) UNIQUE NOT NULL,
+  password VARCHAR(255) NOT NULL,
+  fullName VARCHAR(150),
+  email VARCHAR(150),
+  phone VARCHAR(20),
+  role VARCHAR(50) DEFAULT 'USER',
+  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Seed dữ liệu mặc định cho bảng thông tin bệnh viện
+INSERT IGNORE INTO hospital_booking (id, hospitalName, address, hotline, email, workingHours) VALUES
+(1, 'Bệnh viện Đa khoa Quốc tế ClinicCare', '123 Nguyễn Văn Linh, Q.7, TP.HCM', '1900 1234', 'info@cliniccare.vn', 'T2-T7: 07:00 - 20:00 | CN & Lễ: 07:00 - 12:00 | Cấp cứu: 24/7');
