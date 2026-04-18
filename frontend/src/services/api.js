@@ -39,6 +39,7 @@ export const api = {
   getEmergencyTransfers: () => apiClient.get('/appointments/emergency-transfers'),
 
   getAllPatients: (role, deptId) => apiClient.get('/patients', { params: { role, deptId } }),
+  getPatientById: (id) => apiClient.get(`/patients/${id}`),
   registerPatient: (data) => apiClient.post('/patients/register', data),
   updatePatientProfile: (id, data) => apiClient.put(`/patients/${id}`, data),
 

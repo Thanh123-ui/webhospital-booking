@@ -1,5 +1,9 @@
 const db = require('../data/db');
 
+function isStaffActive(staff) {
+    return staff?.isActive === true || staff?.isActive === 1 || staff?.isActive === '1';
+}
+
 // GET /api/staff?role=BOD  → BOD chỉ xem danh sách bác sĩ (DOCTOR), không được phân quyền
 // GET /api/staff            → Admin/RECEPTIONIST xem toàn bộ
 exports.getAllStaff = async (req, res) => {
@@ -9,7 +13,7 @@ exports.getAllStaff = async (req, res) => {
 
         // Ban Giám Đốc: chỉ thấy danh sách bác sĩ (DOCTOR) đang chạy, không thấy admin/system accounts
         if (role === 'BOD') {
-            const doctors = staffList.filter(s => s.role === 'DOCTOR' && s.isActive === true);
+            const doctors = staffList.filter(s => s.role === 'DOCTOR' && isStaffActive(s));
             return res.json(doctors);
         }
 

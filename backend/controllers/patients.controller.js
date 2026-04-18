@@ -91,6 +91,19 @@ exports.registerPatient = async (req, res) => {
     }
 };
 
+exports.getPatientById = async (req, res) => {
+    try {
+        const patient = await db.findPatientById(parseInt(req.params.id));
+        if (!patient) {
+            return res.status(404).json({ success: false, message: 'Không tìm thấy bệnh nhân' });
+        }
+
+        res.json({ success: true, user: patient });
+    } catch (err) {
+        res.status(500).json({ success: false, message: 'Lỗi server', error: err.message });
+    }
+};
+
 exports.updatePatient = async (req, res) => {
     try {
         const { id } = req.params;

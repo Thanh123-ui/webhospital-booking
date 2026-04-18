@@ -17,6 +17,19 @@ const BookingWizard = () => {
   const [doctors, setDoctors] = useState([]);
   const [schedules, setSchedules] = useState([]);
 
+  const toLocalDateInputValue = (date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const formatBookingDate = (dateStr, options = { day: '2-digit', month: '2-digit', year: 'numeric' }) => {
+    if (!dateStr) return '---';
+    const [year, month, day] = dateStr.split('-').map(Number);
+    return new Intl.DateTimeFormat('vi-VN', options).format(new Date(year, month - 1, day, 12));
+  };
+
   useEffect(() => {
     api.getDepartments().then(res => setDepartments(res.data)).catch(console.error);
     api.getDoctors().then(res => setDoctors(res.data)).catch(console.error);
@@ -43,7 +56,7 @@ const BookingWizard = () => {
   }, [currentPatient]);
 
   const now = new Date();
-  const currentDateStr = now.toISOString().split('T')[0];
+  const currentDateStr = toLocalDateInputValue(now);
   const currentHour = now.getHours();
   const currentMinute = now.getMinutes();
 
@@ -185,9 +198,8 @@ const BookingWizard = () => {
                   ) : (
                     <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
                       {availableDates.map(date => {
-                        const dObj = new Date(date);
-                        const dayStr = dObj.toLocaleDateString('vi-VN', { weekday: 'short' });
-                        const dateStr = dObj.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
+                        const dayStr = formatBookingDate(date, { weekday: 'short' });
+                        const dateStr = formatBookingDate(date, { day: '2-digit', month: '2-digit' });
                         return (
                           <button key={date} onClick={() => setBookingData({...bookingData, date, time: ''})} className={`py-3 px-2 border rounded-xl flex flex-col items-center gap-1 transition-all ${bookingData.date === date ? 'bg-blue-600 text-white border-blue-600 shadow-md ring-2 ring-blue-200' : 'bg-white hover:border-blue-300 text-slate-700'}`}>
                             <span className="text-xs font-semibold uppercase opacity-80">{dayStr}</span>
@@ -347,7 +359,7 @@ const BookingWizard = () => {
                   <div>
                     <div className="text-xs text-slate-500 font-semibold uppercase">Thời gian khám</div>
                     <div className="font-bold text-slate-800 mt-0.5">{bookingData.time || '---'}</div>
-                    <div className="text-sm text-slate-600">{bookingData.date || '---'}</div>
+                    <div className="text-sm text-slate-600">{formatBookingDate(bookingData.date)}</div>
                   </div>
                 </div>
               </div>

@@ -97,6 +97,27 @@ const AdminDashboard = () => {
     return age;
   };
 
+  const normalizeDateValue = (dateValue) => {
+    if (!dateValue) return '';
+    const match = String(dateValue).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (match) return `${match[1]}-${match[2]}-${match[3]}`;
+
+    const parsed = new Date(dateValue);
+    if (Number.isNaN(parsed.getTime())) return String(dateValue);
+
+    const year = parsed.getFullYear();
+    const month = String(parsed.getMonth() + 1).padStart(2, '0');
+    const day = String(parsed.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const getEffectiveDeptId = (appt) => {
+    if (appt.current_department) return parseInt(appt.current_department);
+    if (appt.deptId) return parseInt(appt.deptId);
+    const assignedDoctor = appt.doctorId ? staffList.find(s => s.id === appt.doctorId) : null;
+    return assignedDoctor?.deptId ? parseInt(assignedDoctor.deptId) : null;
+  };
+
   const fetchAppointments = () => api.getAllAppointments(currentStaffUser.role, currentStaffUser.deptId).then(res => setAppointments(res.data)).catch(console.error);
   const fetchPatients    = () => api.getAllPatients(currentStaffUser.role, currentStaffUser.deptId).then(res => setPatients(res.data)).catch(console.error);
   const fetchStaff       = () => api.getAllStaff(role === 'BOD' ? 'BOD' : undefined).then(res => setStaffList(res.data)).catch(console.error);
@@ -242,9 +263,12 @@ const AdminDashboard = () => {
 
   let visibleAppointments = appointments;
 
-  if (apptDateFilter) visibleAppointments = visibleAppointments.filter(a => a.date === apptDateFilter);
+  if (apptDateFilter) {
+    const normalizedFilterDate = normalizeDateValue(apptDateFilter);
+    visibleAppointments = visibleAppointments.filter(a => normalizeDateValue(a.date) === normalizedFilterDate);
+  }
   if (apptTimeFilter) visibleAppointments = visibleAppointments.filter(a => a.time === apptTimeFilter);
-  if (apptDeptFilter) visibleAppointments = visibleAppointments.filter(a => a.deptId === parseInt(apptDeptFilter));
+  if (apptDeptFilter) visibleAppointments = visibleAppointments.filter(a => getEffectiveDeptId(a) === parseInt(apptDeptFilter));
 
   const stats = {
     total: visibleAppointments.length,

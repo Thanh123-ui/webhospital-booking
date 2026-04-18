@@ -32,6 +32,12 @@ const PatientProfile = () => {
     }
   };
 
+  const refreshPatientProfile = async (patientId) => {
+    const res = await api.getPatientById(patientId);
+    setCurrentPatient(res.data.user);
+    return res.data.user;
+  };
+
   const fetchAppts = () => {
     if (currentPatient) {
       api.getAllAppointments().then(res => {
@@ -42,8 +48,14 @@ const PatientProfile = () => {
   }
 
   useEffect(() => {
+    if (currentPatient?.id) {
+      refreshPatientProfile(currentPatient.id).catch(console.error);
+    }
+  }, [currentPatient?.id]);
+
+  useEffect(() => {
     fetchAppts();
-  }, [currentPatient]);
+  }, [currentPatient?.phone]);
 
   const handleSubmitRating = async (e) => {
      e.preventDefault();
