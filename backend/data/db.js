@@ -205,16 +205,11 @@ else if (DB_MODE === 'mysql') {
     try {
       const path = require('path');
       const fs = require('fs');
-      const rows = await query(`SELECT COUNT(*) AS cnt FROM information_schema.tables WHERE table_schema = ? AND table_name = 'departments'`, [process.env.DB_NAME || 'hospital_booking']);
-      if (rows[0].cnt > 0) {
-        console.log('ℹ️  [DB] Schema đã tồn tại, bỏ qua việc tạo mới.');
-        return;
-      }
-      console.log('🔧 [DB] Database trống, đang tự tạo schema từ schema.sql...');
+      console.log('🔧 [DB] Đang đồng bộ schema từ schema.sql...');
       const schemaPath = path.join(__dirname, '..', '..', 'schema.sql');
       const sql = fs.readFileSync(schemaPath, 'utf8');
       await pool.query(sql);
-      console.log('✅  [DB] Tạo schema và seed data thành công!');
+      console.log('✅  [DB] Đồng bộ schema và seed data thành công!');
     } catch (err) {
       console.error('❌  [DB] Lỗi khi tạo schema:', err.message);
     }
