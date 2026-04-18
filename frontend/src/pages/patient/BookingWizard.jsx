@@ -7,7 +7,7 @@ import { useAuth } from '../../services/AuthContext';
 const BookingWizard = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { currentPatient } = useAuth();
+  const { currentPatient, setCurrentPatient } = useAuth();
   const [step, setStep] = useState(1);
   const [bookingData, setBookingData] = useState({ dept: '', doctorId: '', date: '', time: '', name: '', phone: '', email: '', dob: '', cccd: '', gender: '', symptoms: '' });
   const [bookedCode, setBookedCode] = useState('');
@@ -37,7 +37,7 @@ const BookingWizard = () => {
         email: currentPatient.email || '', 
         dob: currentPatient.dob || '',
         cccd: currentPatient.cccd || '',
-        gender: currentPatient.gender || ''
+        gender: (currentPatient.gender && currentPatient.gender !== 'Unknown') ? currentPatient.gender : ''
       }));
     }
   }, [currentPatient]);
@@ -51,7 +51,7 @@ const BookingWizard = () => {
   const availableDocs = doctors.filter(d => {
     const isEmergencyDoc = departments.find(dept => dept.id === d.deptId)?.isEmergency;
     if (isEmergencyDoc) return false;
-    return !bookingData.dept || d.deptId === parseInt(bookingData.dept);
+    return bookingData.dept && d.deptId === parseInt(bookingData.dept);
   });
   const docSchedules = schedules.filter(s => s.doctorId === bookingData.doctorId && s.booked < s.maxPatients);
   
@@ -69,6 +69,22 @@ const BookingWizard = () => {
   const handleBooking = async (e) => {
     e.preventDefault();
     try {
+      if (currentPatient) {
+        const hasProfileChanges =
+          bookingData.cccd !== (currentPatient.cccd || '') ||
+          bookingData.dob !== (currentPatient.dob || '') ||
+          bookingData.gender !== ((currentPatient.gender && currentPatient.gender !== 'Unknown') ? currentPatient.gender : '');
+
+        if (hasProfileChanges) {
+          const profileRes = await api.updatePatientProfile(currentPatient.id, {
+            cccd: bookingData.cccd,
+            dob: bookingData.dob,
+            gender: bookingData.gender,
+          });
+          setCurrentPatient(profileRes.data.user);
+        }
+      }
+
       const payload = {
         name: bookingData.name, 
         phone: bookingData.phone, 
@@ -118,10 +134,6 @@ const BookingWizard = () => {
                 <div>
                   <h3 className="text-lg font-bold text-slate-800 mb-4">1. Chọn Chuyên khoa</h3>
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                    <button onClick={() => setBookingData({...bookingData, dept: '', doctorId: ''})} className={`p-4 border rounded-xl flex flex-col items-center justify-center gap-2 transition-all ${bookingData.dept === '' ? 'bg-blue-50 border-blue-600 text-blue-700 shadow-sm ring-1 ring-blue-600' : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-600'}`}>
-                       <Activity size={28} className={bookingData.dept === '' ? "text-blue-600" : "text-slate-400"}/>
-                       <span className="font-semibold text-sm text-center">Tất cả</span>
-                    </button>
                     {nonEmergencyDepts.map(d => (
                       <button key={d.id} onClick={() => setBookingData({...bookingData, dept: d.id, doctorId: ''})} className={`p-4 border rounded-xl flex flex-col items-center justify-center gap-2 transition-all ${bookingData.dept === d.id ? 'bg-blue-50 border-blue-600 text-blue-700 shadow-sm ring-1 ring-blue-600' : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-600'}`}>
                         <Activity size={28} className={bookingData.dept === d.id ? "text-blue-600" : "text-slate-400"}/>
@@ -134,8 +146,13 @@ const BookingWizard = () => {
                 <div>
                   <h3 className="text-lg font-bold text-slate-800 mb-4 mt-8">2. Chọn Bác sĩ</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {!bookingData.dept && (
+                      <div className="md:col-span-2 p-4 bg-yellow-50 text-yellow-700 border border-yellow-200 rounded-lg">
+                        Vui lòng chọn chuyên khoa trước để xem danh sách bác sĩ phù hợp.
+                      </div>
+                    )}
                     {availableDocs.map(doc => (
-                      <div key={doc.id} onClick={() => setBookingData({...bookingData, doctorId: doc.id})} className={`p-4 rounded-xl border-2 cursor-pointer transition-all flex items-center gap-4 ${bookingData.doctorId === doc.id ? 'border-blue-600 bg-blue-50 shadow-md ring-1 ring-blue-600' : 'border-slate-100 hover:border-blue-300 hover:shadow-sm'}`}>
+                      <div key={doc.id} onClick={() => setBookingData({...bookingData, doctorId: doc.id, dept: doc.deptId})} className={`p-4 rounded-xl border-2 cursor-pointer transition-all flex items-center gap-4 ${bookingData.doctorId === doc.id ? 'border-blue-600 bg-blue-50 shadow-md ring-1 ring-blue-600' : 'border-slate-100 hover:border-blue-300 hover:shadow-sm'}`}>
                         <div className="text-5xl bg-white rounded-full p-2 shadow-sm border border-slate-100">{doc.avatar}</div>
                         <div className="flex-1">
                           <div className="font-bold text-slate-800 text-lg">{doc.name}</div>
@@ -253,8 +270,8 @@ const BookingWizard = () => {
                     </div>
                     <div>
                       <label className="block text-sm font-bold text-slate-700 mb-1">Giới tính <span className="text-red-500">*</span></label>
-                      <select required className={`w-full p-3 border rounded-xl outline-none transition-all ${currentPatient && currentPatient.gender ? 'bg-slate-100 text-slate-500 border-slate-200' : 'bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500'}`}
-                        value={bookingData.gender} onChange={e => setBookingData({...bookingData, gender: e.target.value})} disabled={!!(currentPatient && currentPatient.gender)}>
+                      <select required className={`w-full p-3 border rounded-xl outline-none transition-all ${currentPatient && currentPatient.gender && currentPatient.gender !== 'Unknown' ? 'bg-slate-100 text-slate-500 border-slate-200' : 'bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500'}`}
+                        value={bookingData.gender} onChange={e => setBookingData({...bookingData, gender: e.target.value})} disabled={!!(currentPatient && currentPatient.gender && currentPatient.gender !== 'Unknown')}>
                         <option value="">-- Chọn giới tính --</option>
                         <option value="Nam">Nam</option>
                         <option value="Nữ">Nữ</option>

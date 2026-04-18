@@ -31,6 +31,9 @@ exports.addStaff = async (req, res) => {
         const avatarMap = { BOD: '👔', DOCTOR: '👨‍⚕️', NURSE: '👩‍⚕️', RECEPTIONIST: '👩‍💼', ADMIN: '🧑‍💻' };
 
         const parsedDeptId = (data.deptId && !isNaN(parseInt(data.deptId))) ? parseInt(data.deptId) : null;
+        if ((data.role === 'DOCTOR' || data.role === 'NURSE') && !parsedDeptId) {
+            return res.status(400).json({ message: 'Vui lòng chọn Khoa/Chuyên khoa cho Bác sĩ hoặc Điều dưỡng.' });
+        }
 
         const nextId = await db.nextStaffId();
         const newStaff = {

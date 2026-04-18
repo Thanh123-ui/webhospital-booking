@@ -1,5 +1,21 @@
 const db = require('../data/db');
+const jwt = require('jsonwebtoken');
 const { writeLog } = require('../utils/logger');
+
+const JWT_SECRET = 'clinic_care_super_secret_key_2024';
+
+function getAuthenticatedPatient(req) {
+    const authHeader = req.headers.authorization || '';
+    if (!authHeader.startsWith('Bearer ')) return null;
+
+    try {
+        const token = authHeader.slice(7);
+        const payload = jwt.verify(token, JWT_SECRET);
+        return payload?.role === 'PATIENT' ? payload : null;
+    } catch {
+        return null;
+    }
+}
 
 // ─── POLICY HELPERS ──────────────────────────────────────────────────────────
 
@@ -23,6 +39,14 @@ async function checkCollision(doctorId, date, time, excludeId = null) {
     );
     // Nếu khung giờ này của khoa đã đủ 5 người thì báo Full
     return conflicts.length >= 5;
+}
+
+function getEffectiveDeptId(appt, staffList) {
+    if (appt.current_department) return parseInt(appt.current_department);
+    if (appt.deptId) return parseInt(appt.deptId);
+
+    const assignedDoctor = staffList.find(s => s.id === parseInt(appt.doctorId));
+    return assignedDoctor?.deptId ? parseInt(assignedDoctor.deptId) : null;
 }
 
 /**
@@ -65,15 +89,21 @@ exports.getAllAppointments = async (req, res) => {
     try {
         const { role, deptId } = req.query;
         let result = await db.getAppointments();
+        const staffList = await db.getStaff();
+
+        if ((role === 'DOCTOR' || role === 'NURSE') && !deptId) {
+            // Doctor/nurse views are always department-scoped.
+            return res.json([]);
+        }
 
         if (role === 'DOCTOR' && deptId) {
             const parsedDeptId = parseInt(deptId);
-            result = result.filter(a => a.deptId === parsedDeptId);
+            result = result.filter(a => getEffectiveDeptId(a, staffList) === parsedDeptId);
         }
 
         if (role === 'NURSE' && deptId) {
             const parsedDeptId = parseInt(deptId);
-            result = result.filter(a => a.deptId === parsedDeptId);
+            result = result.filter(a => getEffectiveDeptId(a, staffList) === parsedDeptId);
         }
 
         const patients = await db.getPatients();
@@ -110,10 +140,58 @@ exports.getAppointmentByCode = async (req, res) => {
 exports.createAppointment = async (req, res) => {
     try {
         const data = req.body;
+        const authPatient = getAuthenticatedPatient(req);
+
+        if (!authPatient) {
+            return res.status(401).json({
+                message: 'Vui lòng đăng nhập tài khoản bệnh nhân trước khi đặt lịch.'
+            });
+        }
+
+        const requestedPatientId = parseInt(data.patientId);
+        if (!requestedPatientId || Number.isNaN(requestedPatientId)) {
+            return res.status(400).json({
+                message: 'Thiếu mã bệnh nhân hợp lệ. Vui lòng đăng nhập lại và thử lại.'
+            });
+        }
+
+        if (requestedPatientId !== authPatient.id) {
+            return res.status(403).json({
+                message: 'Phiên đăng nhập không khớp với hồ sơ bệnh nhân đang đặt lịch.'
+            });
+        }
+
+        const patient = await db.findPatientById(requestedPatientId);
+        if (!patient) {
+            return res.status(404).json({
+                message: 'Không tìm thấy hồ sơ bệnh nhân. Vui lòng đăng nhập lại.'
+            });
+        }
+
+        const staffList = await db.getStaff();
+        const assignedDoctor = staffList.find(s => s.id === parseInt(data.doctorId) && s.role === 'DOCTOR' && s.isActive);
+        if (!assignedDoctor) {
+            return res.status(400).json({
+                message: 'Bác sĩ được chọn không tồn tại hoặc hiện không hoạt động.'
+            });
+        }
+
+        const resolvedDeptId = data.deptId ? parseInt(data.deptId) : assignedDoctor.deptId;
+        if (!resolvedDeptId) {
+            return res.status(400).json({
+                message: 'Không xác định được chuyên khoa tiếp nhận cho lịch hẹn này.'
+            });
+        }
+
+        if ((data.phone || '').trim() !== patient.phone) {
+            return res.status(400).json({
+                message: 'Thông tin số điện thoại không khớp với hồ sơ đăng nhập.'
+            });
+        }
 
         // ── POLICY A: Anti-Spam — chặn nếu bệnh nhân đang có >= 2 lịch PENDING ─
-        if (!data.is_emergency && data.status !== 'EMERGENCY' && (data.phone || data.patientId)) {
-            if (await hasSpamBooking(data.phone, data.patientId)) {
+        if (!data.is_emergency && data.status !== 'EMERGENCY') {
+            if (await hasSpamBooking(patient.phone, patient.id)) {
                 return res.status(429).json({
                     message: 'Hệ thống ghi nhận Quý khách đang có từ 2 lịch hẹn chờ khám. \nNhằm đảm bảo cơ hội thăm khám cho cộng đồng, vui lòng hoàn tất hoặc hủy lịch cũ trước khi đặt thêm lịch mới.'
                 });
@@ -142,11 +220,11 @@ exports.createAppointment = async (req, res) => {
         const newAppointment = {
             id: nextId,
             code: data.code || `BK-${Math.floor(1000 + Math.random() * 9000)}`,
-            patientId: data.patientId,
-            patientName: data.name,
-            phone: data.phone,
-            doctorId: data.doctorId,
-            deptId: data.deptId || null,
+            patientId: patient.id,
+            patientName: patient.name,
+            phone: patient.phone,
+            doctorId: parseInt(data.doctorId),
+            deptId: resolvedDeptId,
             date: data.date,
             time: data.time,
             status: data.status || 'PENDING',

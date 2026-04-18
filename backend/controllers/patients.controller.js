@@ -1,26 +1,59 @@
 const db = require('../data/db');
 
+const NURSE_VISIBLE_STATUSES = new Set([
+    'PENDING',
+    'CONFIRMED',
+    'ARRIVED',
+    'READY',
+    'TRANSFER_PENDING',
+]);
+
+function getEffectiveDeptId(appt, staffList) {
+    if (appt.current_department) return parseInt(appt.current_department);
+    if (appt.deptId) return parseInt(appt.deptId);
+
+    const assignedDoctor = staffList.find(s => s.id === parseInt(appt.doctorId));
+    return assignedDoctor?.deptId ? parseInt(assignedDoctor.deptId) : null;
+}
+
 exports.getAllPatients = async (req, res) => {
     try {
         const { role, deptId } = req.query;
-        let result = await db.getPatients();
+        const patients = await db.getPatients();
+        let result = patients;
 
-        if (role === 'DOCTOR' && deptId) {
-            const parsedDeptId = parseInt(deptId);
-            const staffList = await db.getStaff();
-            const docIds = staffList
-                .filter(s => s.role === 'DOCTOR' && s.deptId === parsedDeptId)
-                .map(s => s.id);
-
-            const appointments = await db.getAppointments();
-            result = result.filter(p => {
-                const history = Array.isArray(p.medicalHistory) ? p.medicalHistory : [];
-                const hasHistory = history.some(m => m.deptId === parsedDeptId);
-                const hasActiveAppointment = appointments.some(a => a.patientId === p.id && docIds.includes(a.doctorId));
-                return hasHistory || hasActiveAppointment;
-            });
+        if ((role === 'DOCTOR' || role === 'NURSE') && !deptId) {
+            // In hospital workflow, doctor/nurse must be scoped to a department.
+            return res.json([]);
         }
 
+        if ((role === 'DOCTOR' || role === 'NURSE') && deptId) {
+            const parsedDeptId = parseInt(deptId);
+            const appointments = await db.getAppointments();
+            const staffList = await db.getStaff();
+            const visiblePatients = new Map();
+
+            appointments
+                .filter(a => {
+                    if (getEffectiveDeptId(a, staffList) !== parsedDeptId) return false;
+                    if (role !== 'NURSE') return true;
+                    return NURSE_VISIBLE_STATUSES.has(a.status);
+                })
+                .forEach(a => {
+                    const matchedPatient = patients.find(p =>
+                        (a.patientId && p.id === a.patientId) ||
+                        (a.phone && p.phone === a.phone)
+                    );
+
+                    if (matchedPatient) {
+                        visiblePatients.set(matchedPatient.id, matchedPatient);
+                    }
+                });
+
+            result = Array.from(visiblePatients.values());
+        }
+
+        result.sort((a, b) => a.name.localeCompare(b.name, 'vi'));
         res.json(result);
     } catch (err) {
         res.status(500).json({ message: 'Lỗi server', error: err.message });

@@ -1,14 +1,16 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Lock, User, Phone, Mail, FileText, ArrowRight, Activity } from 'lucide-react';
 import { useAuth } from '../../services/AuthContext';
 import { api } from '../../services/api';
 
 const PatientAuth = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { setCurrentPatient } = useAuth();
   const [isLogin, setIsLogin] = useState(true);
   const [error, setError] = useState('');
+  const redirectTo = location.state?.from || '/';
   
   // Login state
   const [phone, setPhone] = useState('');
@@ -24,12 +26,15 @@ const PatientAuth = () => {
     try {
       if (isLogin) {
         const res = await api.loginPatient(phone, password);
+        localStorage.setItem('patientAccessToken', res.data.accessToken);
         setCurrentPatient(res.data.user);
-        navigate('/');
+        navigate(redirectTo, { replace: true });
       } else {
-        const res = await api.registerPatient(regData);
-        setCurrentPatient(res.data.user);
-        navigate('/');
+        await api.registerPatient(regData);
+        const loginRes = await api.loginPatient(regData.phone, regData.password);
+        localStorage.setItem('patientAccessToken', loginRes.data.accessToken);
+        setCurrentPatient(loginRes.data.user);
+        navigate(redirectTo, { replace: true });
       }
     } catch (err) {
       setError(err.response?.data?.message || 'Có lỗi xảy ra. Hãy thử lại!');

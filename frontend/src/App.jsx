@@ -28,7 +28,14 @@ function App() {
               <main className="flex-1 relative w-full">
                 <Routes>
                   <Route path="/" element={<PatientHome />} />
-                  <Route path="/book" element={<BookingWizard />} />
+                  <Route
+                    path="/book"
+                    element={
+                      currentPatient
+                        ? <BookingWizard />
+                        : <Navigate to="/auth" state={{ from: '/book' }} replace />
+                    }
+                  />
                   <Route path="/track" element={<PatientTracking />} />
                   <Route path="/auth" element={!currentPatient ? <PatientAuth /> : <Navigate to="/" />} />
                   <Route path="/profile" element={currentPatient ? <PatientProfile /> : <Navigate to="/auth" />} />

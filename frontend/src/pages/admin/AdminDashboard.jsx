@@ -14,11 +14,11 @@ import { getStatusBadge, getRoleConfig } from '../../utils/helpers';
 // ADMIN        : Full access
 // BOD          : Full access — chỉ KHÔNG được phân quyền user
 // DOCTOR       : Appointments + patients of own dept + exam
-// NURSE        : Appointments của khoa mình — no medical records
+// NURSE        : Appointments + patients của khoa mình — no medical records
 // RECEPTIONIST : Appointments only (view/confirm/arrived)
 // ─────────────────────────────────────────────────────────────────────────────
 const PERMS = {
-  canViewPatients:  (r) => ['ADMIN','BOD','DOCTOR','RECEPTIONIST'].includes(r),
+  canViewPatients:  (r) => ['ADMIN','BOD','DOCTOR','NURSE','RECEPTIONIST'].includes(r),
   canViewMedical:   (r) => ['ADMIN','BOD','DOCTOR'].includes(r),
   canViewStaff:     (r) => ['ADMIN','BOD'].includes(r),
   canAddStaff:      (r) => ['ADMIN'].includes(r),
@@ -111,24 +111,32 @@ const AdminDashboard = () => {
     if (PERMS.canViewStaff(role)) fetchStaff();
     if (PERMS.canViewLogs(role)) fetchLogs();
 
+    const refreshAppointmentsAndPatients = () => {
+      fetchAppointments();
+      if (PERMS.canViewPatients(role)) fetchPatients();
+    };
+
     const handleNewAppt = (appt) => {
       showToast(`🔔 Lịch khám mới: ${appt.patientName} — ${appt.date} ${appt.time}`, 'info');
-      fetchAppointments();
+      refreshAppointmentsAndPatients();
+    };
+    const handleAppointmentUpdate = () => {
+      refreshAppointmentsAndPatients();
     };
     const handleEmergencyTransfer = ({ transfer }) => {
       showToast(`🚨 Chuyển khoa cấp cứu: ${transfer.patientName} → ${transfer.toDeptName}`, 'emergency');
-      fetchAppointments();
+      refreshAppointmentsAndPatients();
     };
     socket.on('new_appointment', handleNewAppt);
-    socket.on('update_appointment', fetchAppointments);
+    socket.on('update_appointment', handleAppointmentUpdate);
     socket.on('emergency_transfer', handleEmergencyTransfer);
     return () => {
       socket.off('new_appointment', handleNewAppt);
-      socket.off('update_appointment', fetchAppointments);
+      socket.off('update_appointment', handleAppointmentUpdate);
       socket.off('emergency_transfer', handleEmergencyTransfer);
       socket.disconnect();
     };
-  }, [currentStaffUser]);
+  }, [currentStaffUser, role]);
 
   const handleUpdateStatus = async (id, status) => {
     try {
@@ -232,13 +240,7 @@ const AdminDashboard = () => {
   const currentDept = departments.find(d => d.id === currentStaffUser?.deptId);
   const isEmergencyDept = currentDept?.isEmergency;
 
-  // Filter appointments for NURSE: only own dept
-  let visibleAppointments = role === 'NURSE'
-    ? appointments.filter(a => {
-        const docDept = a.deptId || null;
-        return !currentStaffUser.deptId || docDept === currentStaffUser.deptId;
-      })
-    : appointments;
+  let visibleAppointments = appointments;
 
   if (apptDateFilter) visibleAppointments = visibleAppointments.filter(a => a.date === apptDateFilter);
   if (apptTimeFilter) visibleAppointments = visibleAppointments.filter(a => a.time === apptTimeFilter);
@@ -255,6 +257,16 @@ const AdminDashboard = () => {
     s.name.toLowerCase().includes(staffSearchQuery.toLowerCase()) || 
     s.username.toLowerCase().includes(staffSearchQuery.toLowerCase())
   );
+
+  const normalizedPatientSearch = searchTerm.trim().toLowerCase();
+  const filteredPatients = patients.filter(patient => {
+    if (!normalizedPatientSearch) return true;
+    return [
+      patient.patientCode || `BN-${patient.id}`,
+      patient.name,
+      patient.phone,
+    ].some(value => (value || '').toLowerCase().includes(normalizedPatientSearch));
+  });
 
   // Khoa cấp cứu không thể chuyển vào (để loại khỏi target)
   // const nonEmergencyDepts = departments.filter(d => !d.isEmergency);
@@ -451,7 +463,7 @@ const AdminDashboard = () => {
                             <td className="px-5 py-4">
                               <div className="font-bold text-slate-800 flex items-center gap-1.5">
                                 {appt.patientName}
-                                {appt.patientDob && <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-medium">{calcAge(appt.patientDob)}T</span>}
+                                {appt.patientDob && <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-medium">{calcAge(appt.patientDob)} tuổi</span>}
                                 {appt.patientGender && <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded font-medium">{appt.patientGender}</span>}
                               </div>
                               <div className="text-xs text-slate-400">{appt.phone}</div>
@@ -524,12 +536,14 @@ const AdminDashboard = () => {
             <div className="animate-in fade-in">
               <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                 <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center gap-4">
-                  <span className="font-bold text-slate-700">{patients.length} bệnh nhân</span>
+                  <span className="font-bold text-slate-700">
+                    {searchTerm ? `${filteredPatients.length}/${patients.length}` : patients.length} bệnh nhân
+                  </span>
                   <div className="relative">
                     <input
                       type="text"
                       className="w-64 pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-slate-50"
-                      placeholder="Tìm kiếm Mã BN..."
+                      placeholder="Tìm theo mã BN, tên hoặc SĐT..."
                       value={searchTerm}
                       onChange={e => setSearchTerm(e.target.value)}
                     />
@@ -550,9 +564,7 @@ const AdminDashboard = () => {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">
-                      {patients
-                        .filter(p => !searchTerm || (p.patientCode || '').toLowerCase().includes(searchTerm.toLowerCase()))
-                        .map(patient => (
+                      {filteredPatients.map(patient => (
                         <tr key={patient.id} className="hover:bg-slate-50 transition">
                           <td className="px-6 py-4 font-mono font-bold text-blue-600 text-sm">{patient.patientCode || `BN-${patient.id}`}</td>
                           <td className="px-6 py-4">
@@ -582,10 +594,10 @@ const AdminDashboard = () => {
                           )}
                         </tr>
                       ))}
-                      {patients.length === 0 && (
+                      {filteredPatients.length === 0 && (
                         <tr><td colSpan="7" className="px-6 py-12 text-center text-slate-400">
                           <Users size={32} className="mx-auto mb-3 opacity-30"/>
-                          Chưa có dữ liệu bệnh nhân.
+                          {patients.length === 0 ? 'Chưa có dữ liệu bệnh nhân.' : 'Không tìm thấy bệnh nhân phù hợp.'}
                         </td></tr>
                       )}
                     </tbody>

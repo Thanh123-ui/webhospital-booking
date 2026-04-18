@@ -65,7 +65,11 @@ const PatientNavbar = ({ setEmergencyModal }) => {
                 <User size={16} /> {currentPatient.name}
               </Link>
               <button
-                onClick={() => { setCurrentPatient(null); navigate('/'); }}
+                onClick={() => {
+                  localStorage.removeItem('patientAccessToken');
+                  setCurrentPatient(null);
+                  navigate('/');
+                }}
                 className="text-xs text-slate-400 hover:text-red-500 transition"
               >
                 Đăng xuất

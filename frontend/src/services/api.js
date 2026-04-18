@@ -9,6 +9,11 @@ const apiClient = axios.create({
   headers: { 'Content-Type': 'application/json' }
 });
 
+const getPatientAuthHeader = () => {
+  const token = localStorage.getItem('patientAccessToken');
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
+
 export const api = {
   getDepartments: () => apiClient.get('/data/departments'),
   getDoctors: () => apiClient.get('/data/doctors'),
@@ -23,7 +28,7 @@ export const api = {
   getAllAppointments: (role, deptId) => apiClient.get('/appointments', { params: { role, deptId } }),
   // Tra cứu bảo mật: chỉ tìm theo code + phone của chính mình (không lộ ID)
   searchAppointment: (code, phone) => apiClient.get('/appointments/search', { params: { code, phone } }),
-  createAppointment: (data) => apiClient.post('/appointments', data),
+  createAppointment: (data) => apiClient.post('/appointments', data, { headers: getPatientAuthHeader() }),
   updateAppointmentStatus: (id, statusData) => apiClient.put(`/appointments/${id}/status`, statusData),
   addVitals: (id, vitalsData) => apiClient.put(`/appointments/${id}/vitals`, vitalsData),
   saveVitals: (id, vitalsData) => apiClient.put(`/appointments/${id}/vitals`, vitalsData),
