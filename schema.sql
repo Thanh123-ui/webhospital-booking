@@ -2,7 +2,10 @@
 -- BỆNH VIỆN WEB BOOKING - DATABASE SCHEMA & INITIAL DATA
 -- Chạy tự động bởi EC2 user-data khi khởi tạo database AWS RDS
 -- ==============================================================================
+CREATE DATABASE IF NOT EXISTS hospital_booking
+CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
+USE hospital_booking;
 -- Bật sử dụng database (nếu chưa chọn) và set UTF-8
 ALTER DATABASE CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
@@ -178,7 +181,7 @@ CREATE TABLE IF NOT EXISTS vitals (
 -- 10. BẢNG THÔNG TIN BỆNH VIỆN
 CREATE TABLE IF NOT EXISTS hospital_booking (
   id INT PRIMARY KEY AUTO_INCREMENT,
-  hospitalName VARCHAR(255) NOT NULL DEFAULT 'ClinicCare',
+  hospitalName VARCHAR(255) NOT NULL DEFAULT 'Hospital'
   address TEXT,
   hotline VARCHAR(50),
   email VARCHAR(150),
@@ -200,4 +203,4 @@ CREATE TABLE IF NOT EXISTS users (
 
 -- Seed dữ liệu mặc định cho bảng thông tin bệnh viện
 INSERT IGNORE INTO hospital_booking (id, hospitalName, address, hotline, email, workingHours) VALUES
-(1, 'Bệnh viện Đa khoa Quốc tế ClinicCare', '123 Nguyễn Văn Linh, Q.7, TP.HCM', '1900 1234', 'info@cliniccare.vn', 'T2-T7: 07:00 - 20:00 | CN & Lễ: 07:00 - 12:00 | Cấp cứu: 24/7');
+(1, 'Bệnh viện Đa khoa Quốc tế Hosiptal', '123 Nguyễn Văn Linh, Q.7, TP.HCM', '1900 1234', 'info@cliniccare.vn', 'T2-T7: 07:00 - 20:00 | CN & Lễ: 07:00 - 12:00 | Cấp cứu: 24/7');
