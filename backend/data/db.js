@@ -180,7 +180,7 @@ else if (DB_MODE === 'mysql') {
     host:     process.env.DB_HOST     || 'localhost',
     user:     process.env.DB_USER     || 'root',
     password: process.env.DB_PASSWORD || '',
-    database: process.env.DB_NAME     || 'hospital',
+    database: process.env.DB_NAME     || 'hospital_booking',
     charset:  'utf8mb4',
     waitForConnections: true,
     connectionLimit:    10,
@@ -205,7 +205,7 @@ else if (DB_MODE === 'mysql') {
     try {
       const path = require('path');
       const fs = require('fs');
-      const rows = await query(`SELECT COUNT(*) AS cnt FROM information_schema.tables WHERE table_schema = ? AND table_name = 'departments'`, [process.env.DB_NAME || 'hospital']);
+      const rows = await query(`SELECT COUNT(*) AS cnt FROM information_schema.tables WHERE table_schema = ? AND table_name = 'departments'`, [process.env.DB_NAME || 'hospital_booking']);
       if (rows[0].cnt > 0) {
         console.log('ℹ️  [DB] Schema đã tồn tại, bỏ qua việc tạo mới.');
         return;
@@ -260,7 +260,28 @@ else if (DB_MODE === 'mysql') {
 
   async function getDepartments()  { return query('SELECT * FROM departments'); }
   async function getDoctors()      { return query('SELECT * FROM staff WHERE role = \'DOCTOR\' AND isActive = 1'); }
-  async function getAppointments() { return query('SELECT * FROM appointments ORDER BY id DESC'); }
+  async function getAppointments() {
+    const rows = await query(`
+      SELECT a.*, v.bloodPressure, v.heartRate, v.temperature, v.weight, v.height, v.spO2, v.notes, v.recordedBy, v.recordedAt
+      FROM appointments a
+      LEFT JOIN vitals v ON v.appointmentId = a.id
+      ORDER BY a.id DESC
+    `);
+    return rows.map(a => ({
+      ...a,
+      vitals: a.recordedAt ? {
+        bloodPressure: a.bloodPressure,
+        heartRate: a.heartRate,
+        temperature: a.temperature,
+        weight: a.weight,
+        height: a.height,
+        spO2: a.spO2,
+        notes: a.notes,
+        recordedBy: a.recordedBy,
+        recordedAt: a.recordedAt,
+      } : null,
+    }));
+  }
   async function getPatients()     { return query('SELECT * FROM patients'); }
   async function getSchedules()    { return query('SELECT * FROM schedules'); }
   async function getStaff()        { return query('SELECT * FROM staff'); }
@@ -271,27 +292,27 @@ else if (DB_MODE === 'mysql') {
 
   async function saveAppointment(appt) {
     const sql = `INSERT INTO appointments
-      (code, patientId, patientName, phone, doctorId, deptId, \`date\`, \`time\`, status, symptoms, is_emergency, current_department, vitals, history)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`;
+      (code, patientId, patientName, phone, doctorId, deptId, \`date\`, \`time\`, status, symptoms, is_emergency, current_department, history)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`;
     const historyJson = JSON.stringify(appt.history || []);
     const [result] = await pool.execute(sql, [
       appt.code, appt.patientId || null, appt.patientName, appt.phone,
       appt.doctorId || null, appt.deptId || null, appt.date, appt.time,
       appt.status, appt.symptoms || '', appt.is_emergency ? 1 : 0,
-      appt.current_department || null, null, historyJson
+      appt.current_department || null, historyJson
     ]);
     appt.id = result.insertId;
     return appt;
   }
 
   async function updateAppointment(id, fields) {
-    const allowed = ['status','doctorId','deptId','date','time','vitals','history','current_department'];
+    const allowed = ['status','doctorId','deptId','date','time','history','current_department'];
     const sets = [];
     const vals = [];
     for (const [k, v] of Object.entries(fields)) {
       if (!allowed.includes(k)) continue;
       sets.push(`\`${k}\` = ?`);
-      vals.push((k === 'vitals' || k === 'history') ? JSON.stringify(v) : v);
+      vals.push(k === 'history' ? JSON.stringify(v) : v);
     }
     if (!sets.length) return findAppointmentById(id);
     await pool.execute(`UPDATE appointments SET ${sets.join(', ')} WHERE id = ?`, [...vals, id]);
@@ -299,17 +320,51 @@ else if (DB_MODE === 'mysql') {
   }
 
   async function findAppointmentById(id) {
-    const rows = await query('SELECT * FROM appointments WHERE id = ?', [id]);
+    const rows = await query(`
+      SELECT a.*, v.bloodPressure, v.heartRate, v.temperature, v.weight, v.height, v.spO2, v.notes, v.recordedBy, v.recordedAt
+      FROM appointments a
+      LEFT JOIN vitals v ON v.appointmentId = a.id
+      WHERE a.id = ?
+    `, [id]);
     if (!rows[0]) return null;
     const a = rows[0];
     if (typeof a.history === 'string') try { a.history = JSON.parse(a.history); } catch { a.history = []; }
-    if (typeof a.vitals === 'string')  try { a.vitals  = JSON.parse(a.vitals);  } catch { a.vitals  = null; }
+    a.vitals = a.recordedAt ? {
+      bloodPressure: a.bloodPressure,
+      heartRate: a.heartRate,
+      temperature: a.temperature,
+      weight: a.weight,
+      height: a.height,
+      spO2: a.spO2,
+      notes: a.notes,
+      recordedBy: a.recordedBy,
+      recordedAt: a.recordedAt,
+    } : null;
     return a;
   }
 
   async function findAppointmentByCode(code, phone) {
-    const rows = await query('SELECT * FROM appointments WHERE code = ? AND phone = ?', [code, phone]);
-    return rows[0] || null;
+    const rows = await query(`
+      SELECT a.*, v.bloodPressure, v.heartRate, v.temperature, v.weight, v.height, v.spO2, v.notes, v.recordedBy, v.recordedAt
+      FROM appointments a
+      LEFT JOIN vitals v ON v.appointmentId = a.id
+      WHERE a.code = ? AND a.phone = ?
+    `, [code, phone]);
+    if (!rows[0]) return null;
+    const appt = rows[0];
+    if (typeof appt.history === 'string') try { appt.history = JSON.parse(appt.history); } catch { appt.history = []; }
+    appt.vitals = appt.recordedAt ? {
+      bloodPressure: appt.bloodPressure,
+      heartRate: appt.heartRate,
+      temperature: appt.temperature,
+      weight: appt.weight,
+      height: appt.height,
+      spO2: appt.spO2,
+      notes: appt.notes,
+      recordedBy: appt.recordedBy,
+      recordedAt: appt.recordedAt,
+    } : null;
+    return appt;
   }
 
   async function findPatientByPhone(phone) {

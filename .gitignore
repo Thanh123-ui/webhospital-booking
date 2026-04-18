@@ -3,3 +3,4 @@ node_modules/
 dist/
 .gemini/
 system-logs.log
+.vscode/
