@@ -8,6 +8,8 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 require('dotenv').config();
+const bcrypt = require('bcrypt');
+const saltRounds = parseInt(process.env.BCRYPT_SALT_ROUNDS) || 10;
 
 const DB_MODE = (process.env.DB_MODE || 'mock').toLowerCase();
 
@@ -79,6 +81,7 @@ if (DB_MODE === 'mock') {
   }
 
   async function addPatient(patient) {
+    patient.password = await bcrypt.hash(patient.password, saltRounds);
     state.patientsList.push(patient);
     return patient;
   }
@@ -102,6 +105,7 @@ if (DB_MODE === 'mock') {
   }
 
   async function addStaff(staff) {
+    staff.password = await bcrypt.hash(staff.password, saltRounds);
     state.staffList.push(staff);
     return staff;
   }
@@ -109,6 +113,9 @@ if (DB_MODE === 'mock') {
   async function updateStaffField(id, fields) {
     const s = state.staffList.find(s => s.id === id);
     if (!s) return null;
+    if (fields.password) {
+        fields.password = await bcrypt.hash(fields.password, saltRounds);
+    }
     Object.assign(s, fields);
     return s;
   }
@@ -279,7 +286,15 @@ else if (DB_MODE === 'mysql') {
   }
   async function getPatients()     { return query('SELECT * FROM patients'); }
   async function getSchedules()    { return query('SELECT * FROM schedules'); }
-  async function getStaff()        { return query('SELECT * FROM staff'); }
+  async function getStaff()        { 
+    const rows = await query('SELECT * FROM staff'); 
+    return rows.map(s => {
+      if (typeof s.permissions === 'string') {
+        try { s.permissions = JSON.parse(s.permissions); } catch { s.permissions = []; }
+      }
+      return s;
+    });
+  }
   async function getRatings()      { return query('SELECT * FROM ratings ORDER BY id DESC'); }
   async function getEmergencyTransfers() { return query('SELECT * FROM emergency_transfers ORDER BY id DESC'); }
 
@@ -379,11 +394,12 @@ else if (DB_MODE === 'mysql') {
   }
 
   async function addPatient(patient) {
+    const hashedPassword = await bcrypt.hash(patient.password, saltRounds);
     const sql = `INSERT INTO patients (patientCode, cccd, name, phone, email, password, gender, dob, address, medicalHistory)
       VALUES (?,?,?,?,?,?,?,?,?,?)`;
     const [result] = await pool.execute(sql, [
       patient.patientCode, patient.cccd || '', patient.name, patient.phone,
-      patient.email || '', patient.password, patient.gender || 'Unknown',
+      patient.email || '', hashedPassword, patient.gender || 'Unknown',
       patient.dob || null, patient.address || '', JSON.stringify([])
     ]);
     patient.id = result.insertId;
@@ -412,30 +428,50 @@ else if (DB_MODE === 'mysql') {
 
   async function findStaffByUsername(username) {
     const rows = await query('SELECT * FROM staff WHERE username = ?', [username]);
-    return rows[0] || null;
+    const s = rows[0] || null;
+    if (s && typeof s.permissions === 'string') {
+      try { s.permissions = JSON.parse(s.permissions); } catch { s.permissions = []; }
+    }
+    return s;
   }
 
   async function addStaff(staff) {
-    const sql = `INSERT INTO staff (deptId, name, title, avatar, role, isActive, username, password)
-      VALUES (?,?,?,?,?,?,?,?)`;
+    const hashedPassword = await bcrypt.hash(staff.password, saltRounds);
+    const sql = `INSERT INTO staff (deptId, name, title, avatar, role, isActive, username, password, permissions)
+      VALUES (?,?,?,?,?,?,?,?,?)`;
     const [result] = await pool.execute(sql, [
       staff.deptId || null, staff.name, staff.title || '', staff.avatar || '👤',
-      staff.role, staff.isActive ? 1 : 0, staff.username, staff.password
+      staff.role, staff.isActive ? 1 : 0, staff.username, hashedPassword, JSON.stringify(staff.permissions || [])
     ]);
     staff.id = result.insertId;
     return staff;
   }
 
   async function updateStaffField(id, fields) {
-    const allowed = ['role','isActive','password','deptId','name','title'];
+    const allowed = ['role','isActive','password','deptId','name','title','permissions'];
     const sets = []; const vals = [];
     for (const [k, v] of Object.entries(fields)) {
-      if (allowed.includes(k)) { sets.push(`\`${k}\` = ?`); vals.push(v); }
+      if (allowed.includes(k)) { 
+        if (k === 'password') {
+            sets.push(`\`${k}\` = ?`); 
+            vals.push(await bcrypt.hash(v, saltRounds));
+        } else if (k === 'permissions') {
+            sets.push(`\`${k}\` = ?`); 
+            vals.push(JSON.stringify(v));
+        } else {
+            sets.push(`\`${k}\` = ?`); 
+            vals.push(v);
+        }
+      }
     }
     if (!sets.length) return null;
     await pool.execute(`UPDATE staff SET ${sets.join(', ')} WHERE id = ?`, [...vals, id]);
     const rows = await query('SELECT * FROM staff WHERE id = ?', [id]);
-    return rows[0] || null;
+    const s = rows[0] || null;
+    if (s && typeof s.permissions === 'string') {
+      try { s.permissions = JSON.parse(s.permissions); } catch { s.permissions = []; }
+    }
+    return s;
   }
 
   async function addRating(rating) {
