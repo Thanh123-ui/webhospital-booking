@@ -17,11 +17,9 @@ const PatientTracking = () => {
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [appointments, setAppointments] = useState([]);
   const [doctors, setDoctors] = useState([]);
 
   useEffect(() => {
-    api.getAllAppointments().then(res => setAppointments(res.data)).catch(console.error);
     api.getDoctors().then(res => setDoctors(res.data)).catch(console.error);
   }, []);
 
@@ -30,16 +28,21 @@ const PatientTracking = () => {
     setLoading(true);
     setResult(null);
     setError('');
-    await new Promise(r => setTimeout(r, 600)); // UX delay
-    const appt = appointments.find(a => a.code === searchCode.trim().toUpperCase() && a.phone === searchPhone.trim());
-    if (appt) { setResult(appt); } else { setError('Không tìm thấy lịch hẹn phù hợp với thông tin đã nhập.'); }
-    setLoading(false);
+    try {
+      await new Promise(r => setTimeout(r, 600)); // UX delay
+      const res = await api.searchAppointment(searchCode, searchPhone);
+      setResult(res.data);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Không tìm thấy lịch hẹn phù hợp với thông tin đã nhập.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const doctor = result ? doctors.find(d => d.id === result?.doctorId) : null;
 
   const getStepIndex = (status) => {
-    const steps = ['PENDING','CONFIRMED','ARRIVED','READY','DONE'];
+    const steps = ['PENDING','CONFIRMED','ARRIVED','READY','COMPLETED'];
     return steps.indexOf(status);
   };
 

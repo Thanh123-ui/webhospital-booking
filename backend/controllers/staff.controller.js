@@ -4,20 +4,28 @@ function isStaffActive(staff) {
     return staff?.isActive === true || staff?.isActive === 1 || staff?.isActive === '1';
 }
 
+function sanitizeStaff(staff) {
+    if (!staff) return staff;
+    const { password, ...staffWithoutPassword } = staff;
+    return staffWithoutPassword;
+}
+
 // GET /api/staff?role=BOD  → BOD chỉ xem danh sách bác sĩ (DOCTOR), không được phân quyền
 // GET /api/staff            → Admin/RECEPTIONIST xem toàn bộ
 exports.getAllStaff = async (req, res) => {
     try {
-        const { role } = req.query;
+        const { role } = req.user;
         const staffList = await db.getStaff();
 
         // Ban Giám Đốc: chỉ thấy danh sách bác sĩ (DOCTOR) đang chạy, không thấy admin/system accounts
         if (role === 'BOD') {
-            const doctors = staffList.filter(s => s.role === 'DOCTOR' && isStaffActive(s));
+            const doctors = staffList
+                .filter(s => s.role === 'DOCTOR' && isStaffActive(s))
+                .map(sanitizeStaff);
             return res.json(doctors);
         }
 
-        res.json(staffList);
+        res.json(staffList.map(sanitizeStaff));
     } catch (err) {
         res.status(500).json({ message: 'Lỗi server', error: err.message });
     }
@@ -54,7 +62,7 @@ exports.addStaff = async (req, res) => {
         };
 
         await db.addStaff(newStaff);
-        res.status(201).json(newStaff);
+        res.status(201).json(sanitizeStaff(newStaff));
     } catch (err) {
         res.status(500).json({ message: 'Lỗi server', error: err.message });
     }
@@ -64,16 +72,11 @@ exports.addStaff = async (req, res) => {
 exports.updateStaffRole = async (req, res) => {
     try {
         const { id } = req.params;
-        const { role, requesterRole } = req.body;
-
-        // BOD không có quyền thay đổi role
-        if (requesterRole === 'BOD') {
-            return res.status(403).json({ message: 'Ban Giám Đốc không có quyền phân quyền nhân viên. Vui lòng liên hệ Admin.' });
-        }
+        const { role } = req.body;
 
         const updated = await db.updateStaffField(parseInt(id), { role });
         if (!updated) return res.status(404).json({ message: 'Not found' });
-        res.json(updated);
+        res.json(sanitizeStaff(updated));
     } catch (err) {
         res.status(500).json({ message: 'Lỗi server', error: err.message });
     }
@@ -83,19 +86,13 @@ exports.updateStaffRole = async (req, res) => {
 exports.toggleStaffActive = async (req, res) => {
     try {
         const { id } = req.params;
-        const { requesterRole } = req.body;
-
-        // BOD không có quyền bật/tắt nhân viên
-        if (requesterRole === 'BOD') {
-            return res.status(403).json({ message: 'Ban Giám Đốc không có quyền vô hiệu hóa nhân viên. Vui lòng liên hệ Admin.' });
-        }
 
         const staffList = await db.getStaff();
         const staff = staffList.find(s => s.id === parseInt(id));
         if (!staff) return res.status(404).json({ message: 'Not found' });
 
         const updated = await db.updateStaffField(parseInt(id), { isActive: !staff.isActive });
-        res.json(updated);
+        res.json(sanitizeStaff(updated));
     } catch (err) {
         res.status(500).json({ message: 'Lỗi server', error: err.message });
     }
@@ -104,15 +101,11 @@ exports.toggleStaffActive = async (req, res) => {
 exports.updateStaffPassword = async (req, res) => {
     try {
         const { id } = req.params;
-        const { newPassword, requesterRole } = req.body;
-
-        if (requesterRole !== 'ADMIN') {
-            return res.status(403).json({ message: 'Chỉ Admin hệ thống mới có quyền Reset Mật khẩu.' });
-        }
+        const { newPassword } = req.body;
 
         const updated = await db.updateStaffField(parseInt(id), { password: newPassword });
         if (!updated) return res.status(404).json({ message: 'Not found' });
-        res.json({ message: 'Đổi mật khẩu thành công.', staff: updated });
+        res.json({ message: 'Đổi mật khẩu thành công.', staff: sanitizeStaff(updated) });
     } catch (err) {
         res.status(500).json({ message: 'Lỗi server', error: err.message });
     }

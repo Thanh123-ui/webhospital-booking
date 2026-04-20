@@ -24,7 +24,7 @@ const PatientProfile = () => {
   const handleUpdateProfile = async (e) => {
     e.preventDefault();
     try {
-       const res = await api.updatePatientProfile(currentPatient.id, profileData);
+       const res = await api.updatePatientProfile(currentPatient.id, profileData, 'patient');
        setCurrentPatient(res.data.user);
        setEditProfileModal(false);
     } catch(err) {
@@ -33,17 +33,16 @@ const PatientProfile = () => {
   };
 
   const refreshPatientProfile = async (patientId) => {
-    const res = await api.getPatientById(patientId);
+    const res = await api.getPatientById(patientId, 'patient');
     setCurrentPatient(res.data.user);
     return res.data.user;
   };
 
   const fetchAppts = () => {
     if (currentPatient) {
-      api.getAllAppointments().then(res => {
-        const myAppts = res.data.filter(a => a.phone === currentPatient.phone);
-        setAppointments(myAppts);
-      }).catch(console.error);
+      api.getAllAppointments(undefined, undefined, 'patient')
+        .then(res => setAppointments(res.data))
+        .catch(console.error);
     }
   }
 
@@ -82,7 +81,7 @@ const PatientProfile = () => {
   const handleCancelAppt = async (id) => {
     if(!window.confirm("Bạn có chắc chắn muốn hủy lịch khám này không?")) return;
     try {
-      await api.cancelAppointment(id, { role: 'PATIENT', reason: 'Bệnh nhân tự hủy qua cổng thông tin' });
+      await api.cancelAppointment(id, { role: 'PATIENT', reason: 'Bệnh nhân tự hủy qua cổng thông tin' }, 'patient');
       fetchAppts();
       alert("Đã gửi yêu cầu hủy lịch.");
     } catch(err) {

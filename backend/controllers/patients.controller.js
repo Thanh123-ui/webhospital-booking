@@ -16,21 +16,28 @@ function getEffectiveDeptId(appt, staffList) {
     return assignedDoctor?.deptId ? parseInt(assignedDoctor.deptId) : null;
 }
 
+function sanitizePatient(patient) {
+    if (!patient) return patient;
+    const { password, ...patientWithoutPassword } = patient;
+    return patientWithoutPassword;
+}
+
 exports.getAllPatients = async (req, res) => {
     try {
-        const { role, deptId } = req.query;
+        const { role, id } = req.user;
         const patients = await db.getPatients();
         let result = patients;
 
-        if ((role === 'DOCTOR' || role === 'NURSE') && !deptId) {
-            // In hospital workflow, doctor/nurse must be scoped to a department.
-            return res.json([]);
-        }
-
-        if ((role === 'DOCTOR' || role === 'NURSE') && deptId) {
-            const parsedDeptId = parseInt(deptId);
+        if (role === 'DOCTOR' || role === 'NURSE') {
             const appointments = await db.getAppointments();
             const staffList = await db.getStaff();
+            const currentStaff = staffList.find(s => s.id === parseInt(id));
+
+            if (!currentStaff?.deptId) {
+                return res.json([]);
+            }
+
+            const parsedDeptId = parseInt(currentStaff.deptId);
             const visiblePatients = new Map();
 
             appointments
@@ -53,7 +60,10 @@ exports.getAllPatients = async (req, res) => {
             result = Array.from(visiblePatients.values());
         }
 
-        result.sort((a, b) => a.name.localeCompare(b.name, 'vi'));
+        result = result
+            .map(sanitizePatient)
+            .sort((a, b) => a.name.localeCompare(b.name, 'vi'));
+
         res.json(result);
     } catch (err) {
         res.status(500).json({ message: 'Lỗi server', error: err.message });
@@ -85,7 +95,7 @@ exports.registerPatient = async (req, res) => {
         };
 
         await db.addPatient(newPatient);
-        res.status(201).json({ success: true, user: newPatient });
+        res.status(201).json({ success: true, user: sanitizePatient(newPatient) });
     } catch (err) {
         res.status(500).json({ success: false, message: 'Lỗi server', error: err.message });
     }
@@ -93,12 +103,19 @@ exports.registerPatient = async (req, res) => {
 
 exports.getPatientById = async (req, res) => {
     try {
-        const patient = await db.findPatientById(parseInt(req.params.id));
+        const requestedId = parseInt(req.params.id);
+        const requester = req.user;
+
+        if (requester.role === 'PATIENT' && requester.id !== requestedId) {
+            return res.status(403).json({ success: false, message: 'Bạn không có quyền xem hồ sơ của bệnh nhân khác.' });
+        }
+
+        const patient = await db.findPatientById(requestedId);
         if (!patient) {
             return res.status(404).json({ success: false, message: 'Không tìm thấy bệnh nhân' });
         }
 
-        res.json({ success: true, user: patient });
+        res.json({ success: true, user: sanitizePatient(patient) });
     } catch (err) {
         res.status(500).json({ success: false, message: 'Lỗi server', error: err.message });
     }
@@ -108,13 +125,18 @@ exports.updatePatient = async (req, res) => {
     try {
         const { id } = req.params;
         const { cccd, dob, gender } = req.body;
+        const requester = req.user;
+
+        if (requester.role === 'PATIENT' && requester.id !== parseInt(id)) {
+            return res.status(403).json({ success: false, message: 'Bạn không có quyền cập nhật hồ sơ của bệnh nhân khác.' });
+        }
 
         const updated = await db.updatePatient(parseInt(id), { cccd, dob, gender });
         if (!updated) {
             return res.status(404).json({ success: false, message: 'Không tìm thấy bệnh nhân' });
         }
 
-        res.json({ success: true, user: updated });
+        res.json({ success: true, user: sanitizePatient(updated) });
     } catch (err) {
         res.status(500).json({ success: false, message: 'Lỗi server', error: err.message });
     }

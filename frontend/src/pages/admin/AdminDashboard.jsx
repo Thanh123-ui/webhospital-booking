@@ -23,7 +23,7 @@ const PERMS = {
   canViewStaff:     (r) => ['ADMIN','BOD'].includes(r),
   canAddStaff:      (r) => ['ADMIN'].includes(r),
   canChangeRole:    (r) => r === 'ADMIN',           // BOD KHÔNG được phân quyền
-  canToggleActive:  (r) => ['ADMIN','BOD'].includes(r),
+  canToggleActive:  (r) => r === 'ADMIN',
   canViewLogs:      (r) => ['ADMIN'].includes(r),
   canExam:          (r) => r === 'DOCTOR',
   canUpdateStatus:  (r) => ['ADMIN','BOD','DOCTOR','NURSE','RECEPTIONIST'].includes(r),
@@ -169,7 +169,7 @@ const AdminDashboard = () => {
   const handleCancelAppointment = async (id) => {
     if (!window.confirm('Bạn có chắc chắn muốn hủy lịch hẹn này?')) return;
     try {
-      await api.cancelAppointment(id, { role, reason: 'Hủy bởi nhân viên bệnh viện' });
+      await api.cancelAppointment(id, { role, reason: 'Hủy bởi nhân viên bệnh viện' }, 'staff');
       fetchAppointments();
     } catch { alert('Lỗi khi hủy lịch!'); }
   };
@@ -199,7 +199,7 @@ const AdminDashboard = () => {
 
   const handleToggleStaff = async (id) => {
     try {
-      await api.toggleStaffActive(id, role);
+      await api.toggleStaffActive(id);
       fetchStaff();
     } catch (err) { alert(err.response?.data?.message || 'Lỗi khi thay đổi trạng thái!'); }
   };
@@ -207,7 +207,7 @@ const AdminDashboard = () => {
   const handleChangeRole = async (id, newRole) => {
     if (!window.confirm(`Đổi vai trò sang "${newRole}"?`)) return;
     try {
-      await api.updateStaffRole(id, newRole, role);
+      await api.updateStaffRole(id, newRole);
       fetchStaff();
       showToast('✅ Đã cập nhật vai trò!');
     } catch (err) { alert(err.response?.data?.message || 'Lỗi khi đổi quyền!'); }
@@ -217,7 +217,7 @@ const AdminDashboard = () => {
     e.preventDefault();
     if (resetPassValue.length < 3) return alert('Mật khẩu quá ngắn');
     try {
-      await api.resetStaffPassword(resetPassModal, resetPassValue, role);
+      await api.resetStaffPassword(resetPassModal, resetPassValue);
       showToast('✅ Đã cấp lại mật khẩu thành công!');
       setResetPassModal(null);
       setResetPassValue('');
@@ -255,7 +255,11 @@ const AdminDashboard = () => {
     } catch (err) { alert(err.response?.data?.message || 'Lỗi khi chuyển khoa!'); }
   };
 
-  const logout = () => { setCurrentStaffUser(null); navigate('/admin'); };
+  const logout = () => {
+    localStorage.removeItem('staffAccessToken');
+    setCurrentStaffUser(null);
+    navigate('/admin');
+  };
 
   const roleConfig = getRoleConfig(role);
   const currentDept = departments.find(d => d.id === currentStaffUser?.deptId);
@@ -273,7 +277,7 @@ const AdminDashboard = () => {
   const stats = {
     total: visibleAppointments.length,
     waiting: visibleAppointments.filter(a => ['READY', 'ARRIVED', 'TRANSFER_PENDING'].includes(a.status)).length,
-    done: visibleAppointments.filter(a => a.status === 'DONE').length,
+    done: visibleAppointments.filter(a => a.status === 'COMPLETED').length,
     emergency: visibleAppointments.filter(a => a.is_emergency).length
   };
 

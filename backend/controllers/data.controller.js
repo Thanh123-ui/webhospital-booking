@@ -1,5 +1,11 @@
 const db = require('../data/db');
 
+function sanitizeDoctor(doctor) {
+  if (!doctor) return doctor;
+  const { password, username, ...doctorWithoutSecrets } = doctor;
+  return doctorWithoutSecrets;
+}
+
 exports.getDepartments = async (req, res) => {
   try {
     const departments = await db.getDepartments();
@@ -12,7 +18,7 @@ exports.getDepartments = async (req, res) => {
 exports.getDoctors = async (req, res) => {
   try {
     const doctors = await db.getDoctors();
-    res.json(doctors);
+    res.json(doctors.map(sanitizeDoctor));
   } catch (err) {
     res.status(500).json({ message: 'Lỗi server', error: err.message });
   }
@@ -62,7 +68,7 @@ exports.getTopDoctors = async (req, res) => {
     const doctorsWithRating = doctors.map(doc => {
       const stats = aggregated[doc.name];
       return {
-        ...doc,
+        ...sanitizeDoctor(doc),
         avgRating: stats ? (stats.sum / stats.count).toFixed(1) : 5.0,
         reviewCount: stats ? stats.count : 0
       };

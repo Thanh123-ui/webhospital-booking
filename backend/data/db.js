@@ -30,24 +30,24 @@ if (DB_MODE === 'mock') {
   const state = {
     mockDepartments,
     mockDoctors,
-    schedules:          generateMockSchedules(),
-    staffList:          [...initialStaff],
-    patientsList:       [...initialPatients],
-    appointmentsList:   [...initialAppointments],
-    logsList:           [],
-    ratingsList:        [],
+    schedules: generateMockSchedules(),
+    staffList: [...initialStaff],
+    patientsList: [...initialPatients],
+    appointmentsList: [...initialAppointments],
+    logsList: [],
+    ratingsList: [],
     emergencyTransfers: [],
   };
 
   // ── Async API (mock trả về Promise để interface đồng nhất với MySQL) ──────
 
-  async function getDepartments()  { return state.mockDepartments; }
-  async function getDoctors()      { return state.mockDoctors; }
+  async function getDepartments() { return state.mockDepartments; }
+  async function getDoctors() { return state.mockDoctors; }
   async function getAppointments() { return state.appointmentsList; }
-  async function getPatients()     { return state.patientsList; }
-  async function getSchedules()    { return state.schedules; }
-  async function getStaff()        { return state.staffList; }
-  async function getRatings()      { return state.ratingsList; }
+  async function getPatients() { return state.patientsList; }
+  async function getSchedules() { return state.schedules; }
+  async function getStaff() { return state.staffList; }
+  async function getRatings() { return state.ratingsList; }
   async function getEmergencyTransfers() { return state.emergencyTransfers; }
 
   // ── CRUD async functions (mock mode) ────────────────────────────────────
@@ -114,7 +114,7 @@ if (DB_MODE === 'mock') {
     const s = state.staffList.find(s => s.id === id);
     if (!s) return null;
     if (fields.password) {
-        fields.password = await bcrypt.hash(fields.password, saltRounds);
+      fields.password = await bcrypt.hash(fields.password, saltRounds);
     }
     Object.assign(s, fields);
     return s;
@@ -143,8 +143,8 @@ if (DB_MODE === 'mock') {
   }
 
   async function nextAppointmentId() { return state.appointmentsList.length + 1; }
-  async function nextPatientId()     { return state.patientsList.length + 1; }
-  async function nextStaffId()       { return state.staffList.length + 1; }
+  async function nextPatientId() { return state.patientsList.length + 1; }
+  async function nextStaffId() { return state.staffList.length + 1; }
 
   // Vitals — lưu sinh hiệu (mock mode dùng Map trong bộ nhớ)
   const vitalsStore = new Map();
@@ -184,14 +184,14 @@ else if (DB_MODE === 'mysql') {
 
   // Pool kết nối (tái sử dụng connection, auto-reconnect)
   const pool = mysql.createPool({
-    host:     process.env.DB_HOST     || 'localhost',
-    user:     process.env.DB_USER     || 'root',
+    host: process.env.DB_HOST || 'localhost',
+    user: process.env.DB_USER || 'root',
     password: process.env.DB_PASSWORD || '',
-    database: process.env.DB_NAME     || 'hospital_booking',
-    charset:  'utf8mb4',
+    database: process.env.DB_NAME || 'hospital_booking',
+    charset: 'utf8mb4',
     waitForConnections: true,
-    connectionLimit:    10,
-    queueLimit:         0,
+    connectionLimit: 10,
+    queueLimit: 0,
     multipleStatements: true,
   });
 
@@ -231,8 +231,8 @@ else if (DB_MODE === 'mysql') {
       const doctors = await query("SELECT id FROM staff WHERE role = 'DOCTOR' AND isActive = 1");
       if (!doctors.length) return;
       const slots = [];
-      const push = (startMin, count) => { for (let i = 0; i < count; i++) { const m = startMin + i * 35; slots.push(`${String(Math.floor(m/60)).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`); } };
-      push(7*60, 8); push(13*60, 7);
+      const push = (startMin, count) => { for (let i = 0; i < count; i++) { const m = startMin + i * 35; slots.push(`${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`); } };
+      push(7 * 60, 8); push(13 * 60, 7);
       const today = new Date();
       const inserts = [];
       for (let i = 0; i < 7; i++) {
@@ -260,8 +260,8 @@ else if (DB_MODE === 'mysql') {
     return rows;
   }
 
-  async function getDepartments()  { return query('SELECT * FROM departments'); }
-  async function getDoctors()      { return query('SELECT * FROM staff WHERE role = \'DOCTOR\' AND isActive = 1'); }
+  async function getDepartments() { return query('SELECT * FROM departments'); }
+  async function getDoctors() { return query('SELECT * FROM staff WHERE role = \'DOCTOR\' AND isActive = 1'); }
   async function getAppointments() {
     const rows = await query(`
       SELECT a.*, v.bloodPressure, v.heartRate, v.temperature, v.weight, v.height, v.spO2, v.notes, v.recordedBy, v.recordedAt
@@ -284,10 +284,10 @@ else if (DB_MODE === 'mysql') {
       } : null,
     }));
   }
-  async function getPatients()     { return query('SELECT * FROM patients'); }
-  async function getSchedules()    { return query('SELECT * FROM schedules'); }
-  async function getStaff()        { 
-    const rows = await query('SELECT * FROM staff'); 
+  async function getPatients() { return query('SELECT * FROM patients'); }
+  async function getSchedules() { return query('SELECT * FROM schedules'); }
+  async function getStaff() {
+    const rows = await query('SELECT * FROM staff');
     return rows.map(s => {
       if (typeof s.permissions === 'string') {
         try { s.permissions = JSON.parse(s.permissions); } catch { s.permissions = []; }
@@ -295,7 +295,7 @@ else if (DB_MODE === 'mysql') {
       return s;
     });
   }
-  async function getRatings()      { return query('SELECT * FROM ratings ORDER BY id DESC'); }
+  async function getRatings() { return query('SELECT * FROM ratings ORDER BY id DESC'); }
   async function getEmergencyTransfers() { return query('SELECT * FROM emergency_transfers ORDER BY id DESC'); }
 
   // ── CRUD functions (MySQL mode) ──────────────────────────────────────────
@@ -316,7 +316,7 @@ else if (DB_MODE === 'mysql') {
   }
 
   async function updateAppointment(id, fields) {
-    const allowed = ['status','doctorId','deptId','date','time','history','current_department'];
+    const allowed = ['status', 'doctorId', 'deptId', 'date', 'time', 'history', 'current_department'];
     const sets = [];
     const vals = [];
     for (const [k, v] of Object.entries(fields)) {
@@ -407,7 +407,7 @@ else if (DB_MODE === 'mysql') {
   }
 
   async function updatePatient(id, fields) {
-    const allowed = ['cccd','dob','gender'];
+    const allowed = ['cccd', 'dob', 'gender'];
     const sets = []; const vals = [];
     for (const [k, v] of Object.entries(fields)) {
       if (allowed.includes(k) && v !== undefined) { sets.push(`\`${k}\` = ?`); vals.push(v); }
@@ -428,11 +428,7 @@ else if (DB_MODE === 'mysql') {
 
   async function findStaffByUsername(username) {
     const rows = await query('SELECT * FROM staff WHERE username = ?', [username]);
-    const s = rows[0] || null;
-    if (s && typeof s.permissions === 'string') {
-      try { s.permissions = JSON.parse(s.permissions); } catch { s.permissions = []; }
-    }
-    return s;
+    return rows[0] || null;
   }
 
   async function addStaff(staff) {
@@ -448,19 +444,19 @@ else if (DB_MODE === 'mysql') {
   }
 
   async function updateStaffField(id, fields) {
-    const allowed = ['role','isActive','password','deptId','name','title','permissions'];
+    const allowed = ['role', 'isActive', 'password', 'deptId', 'name', 'title', 'permissions'];
     const sets = []; const vals = [];
     for (const [k, v] of Object.entries(fields)) {
-      if (allowed.includes(k)) { 
+      if (allowed.includes(k)) {
         if (k === 'password') {
-            sets.push(`\`${k}\` = ?`); 
-            vals.push(await bcrypt.hash(v, saltRounds));
+          sets.push(`\`${k}\` = ?`);
+          vals.push(await bcrypt.hash(v, saltRounds));
         } else if (k === 'permissions') {
-            sets.push(`\`${k}\` = ?`); 
-            vals.push(JSON.stringify(v));
+          sets.push(`\`${k}\` = ?`);
+          vals.push(JSON.stringify(v));
         } else {
-            sets.push(`\`${k}\` = ?`); 
-            vals.push(v);
+          sets.push(`\`${k}\` = ?`);
+          vals.push(v);
         }
       }
     }
