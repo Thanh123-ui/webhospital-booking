@@ -4,3 +4,11 @@ dist/
 .gemini/
 system-logs.log
 .vscode/
+._system-logs.log
+backend/._package-lock.json
+frontend/._package-lock.json
+backend/._package.json
+frontend/._package.json
+._schema.sql
+frontend/._node_modules
+backend/._node_modulesf
