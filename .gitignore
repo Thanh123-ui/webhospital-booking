@@ -4,6 +4,8 @@ dist/
 .gemini/
 system-logs.log
 .vscode/
+._*
+**/._*
 ._system-logs.log
 backend/._package-lock.json
 frontend/._package-lock.json
