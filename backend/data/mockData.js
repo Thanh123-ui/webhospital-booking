@@ -2,7 +2,7 @@
 // mockData.js — Toàn bộ dữ liệu mẫu (in-memory) cho chế độ DB_MODE=mock
 // Không sửa file này; chỉ sửa db.js hoặc thêm dữ liệu tại đây.
 // ─────────────────────────────────────────────────────────────────────────────
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 const hash = (pass) => bcrypt.hashSync(pass, 10);
 
 const mockDepartments = [

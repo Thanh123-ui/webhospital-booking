@@ -8,7 +8,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 require('dotenv').config();
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 const saltRounds = parseInt(process.env.BCRYPT_SALT_ROUNDS) || 10;
 
 const DB_MODE = (process.env.DB_MODE || 'mock').toLowerCase();

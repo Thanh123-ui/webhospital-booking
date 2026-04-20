@@ -197,7 +197,7 @@ const PatientProfile = () => {
               {/* Phần được in */}
               <div id="print-section" className="p-8 bg-white overflow-y-auto print:p-0 print:absolute print:top-0 print:left-0 print:w-[A5] print:h-screen print:m-0 print:shadow-none">
                  <div className="text-center border-b-2 border-slate-800 pb-4 mb-6">
-                    <h1 className="text-2xl font-black text-blue-800 uppercase tracking-widest mb-1">ClinicCare</h1>
+                    <h1 className="text-2xl font-black text-blue-800 uppercase tracking-widest mb-1">Hospital</h1>
                     <p className="text-sm text-slate-600 font-semibold">Phòng Khám Đa Khoa Quốc Tế</p>
                     <p className="text-xs text-slate-500">123 Nguyễn Văn Linh, Quận 7, TP.HCM | Hotline: 1900 1234</p>
                  </div>

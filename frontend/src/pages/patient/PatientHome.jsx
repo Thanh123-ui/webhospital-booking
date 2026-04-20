@@ -56,7 +56,7 @@ const PatientHome = () => {
               </h1>
 
               <p className="text-blue-100 text-lg mb-8 max-w-lg leading-relaxed font-light">
-                Bệnh viện Đa khoa Quốc tế ClinicCare — nơi hội tụ đội ngũ bác sĩ đầu ngành từ các chuyên khoa Tim mạch, Thần kinh, Nhi khoa và Nha khoa. Đặt lịch online, nhận kết quả nhanh — không cần xếp hàng chờ đợi.
+                Bệnh viện Đa khoa Quốc tế Hospital — nơi hội tụ đội ngũ bác sĩ đầu ngành từ các chuyên khoa Tim mạch, Thần kinh, Nhi khoa và Nha khoa. Đặt lịch online, nhận kết quả nhanh — không cần xếp hàng chờ đợi.
               </p>
 
               <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
@@ -259,7 +259,7 @@ const PatientHome = () => {
               </div>
               <span className="text-white font-black text-lg">HOSPITAL</span>
             </div>
-            <p className="text-sm leading-relaxed">Thành lập năm 2001, Bệnh viện Đa khoa Quốc tế ClinicCare là địa chỉ y tế tin cậy của hơn 128.000 bệnh nhân tại TP.HCM và các tỉnh lân cận.</p>
+            <p className="text-sm leading-relaxed">Thành lập năm 2001, Bệnh viện Đa khoa Quốc tế Hospital là địa chỉ y tế tin cậy của hơn 128.000 bệnh nhân tại TP.HCM và các tỉnh lân cận.</p>
           </div>
           <div>
             <div className="text-white font-bold mb-4">Chuyên khoa</div>
@@ -285,7 +285,7 @@ const PatientHome = () => {
           </div>
         </div>
         <div className="max-w-6xl mx-auto mt-10 pt-6 border-t border-slate-800 text-center text-xs text-slate-500">
-          © 2001–2024 Bệnh viện Đa khoa Quốc tế ClinicCare. Giấy phép HĐKD số 0312345678 — Sở Y tế TP.HCM cấp phép.</div>
+          © 2001–2024 Bệnh viện Đa khoa Quốc tế Hospital. Giấy phép HĐKD số 0312345678 — Sở Y tế TP.HCM cấp phép.</div>
       </footer>
     </div>
   );

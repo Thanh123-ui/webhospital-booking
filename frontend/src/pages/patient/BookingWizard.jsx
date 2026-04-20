@@ -320,7 +320,7 @@ const BookingWizard = () => {
                    </div>
                 </div>
                 <h3 className="text-3xl font-extrabold text-slate-800 mb-3">Đặt lịch thành công!</h3>
-                <p className="text-slate-600 mb-8 max-w-md mx-auto">Cảm ơn bạn đã tin tưởng ClinicCare. Hãy tới phòng khám đúng giờ nhé.</p>
+                <p className="text-slate-600 mb-8 max-w-md mx-auto">Cảm ơn bạn đã tin tưởng Hospital. Hãy tới phòng khám đúng giờ nhé.</p>
                 
                 <div className="bg-white border-2 border-dashed border-blue-200 rounded-2xl p-8 max-w-md mx-auto text-left relative overflow-hidden shadow-sm mb-10">
                   <div className="absolute top-0 left-0 w-full h-2 bg-blue-500"></div>

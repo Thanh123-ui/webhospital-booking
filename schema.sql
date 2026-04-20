@@ -197,4 +197,4 @@ CREATE TABLE IF NOT EXISTS users (
 
 -- Seed dữ liệu mặc định cho bảng thông tin bệnh viện
 INSERT IGNORE INTO hospital_booking (id, hospitalName, address, hotline, email, workingHours) VALUES
-(1, 'Bệnh viện Đa khoa Quốc tế Hospital', '123 Nguyễn Văn Linh, Q.7, TP.HCM', '1900 1234', 'info@cliniccare.vn', 'T2-T7: 07:00 - 20:00 | CN & Lễ: 07:00 - 12:00 | Cấp cứu: 24/7');
+(1, 'Bệnh viện Đa khoa Quốc tế Hospital', '123 Nguyễn Văn Linh, Q.7, TP.HCM', '1900 1234', 'info@hospital.vn', 'T2-T7: 07:00 - 20:00 | CN & Lễ: 07:00 - 12:00 | Cấp cứu: 24/7');

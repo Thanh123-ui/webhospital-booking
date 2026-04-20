@@ -1,6 +1,6 @@
 const db = require('../data/db');
 const jwt = require('jsonwebtoken');
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 const { writeLog } = require('../utils/logger');
 
 const getJwtSecret = () => process.env.JWT_SECRET || 'fallback_secret_do_not_use_in_prod';
