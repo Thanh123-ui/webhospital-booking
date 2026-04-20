@@ -4,6 +4,23 @@ import { CalendarCheck, Check, Activity, Award, ArrowRight, ChevronRight, User, 
 import { api } from '../../services/api';
 import { useAuth } from '../../services/AuthContext';
 
+const DEPT_TONES = {
+  'Tim mạch': 'from-rose-100 via-white to-red-100 text-rose-700 border-rose-200',
+  'Nhi khoa': 'from-sky-100 via-white to-cyan-100 text-sky-700 border-sky-200',
+  'Nha khoa': 'from-teal-100 via-white to-emerald-100 text-teal-700 border-teal-200',
+  'Thần kinh': 'from-violet-100 via-white to-purple-100 text-violet-700 border-violet-200',
+};
+
+const getDoctorInitials = (name = '') =>
+  name
+    .replace(/^BS\.\s*/i, '')
+    .trim()
+    .split(/\s+/)
+    .slice(-2)
+    .map((part) => part[0])
+    .join('')
+    .toUpperCase();
+
 const BookingWizard = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -78,6 +95,11 @@ const BookingWizard = () => {
 
   const morningTimes = availableTimes.filter(t => parseInt(t.split(':')[0]) < 12);
   const afternoonTimes = availableTimes.filter(t => parseInt(t.split(':')[0]) >= 12);
+
+  const getDoctorTone = (doc) => {
+    const deptName = departments.find((dept) => dept.id === doc?.deptId)?.name;
+    return DEPT_TONES[deptName] || 'from-primary-container via-white to-secondary-container text-primary-dim border-primary/10';
+  };
 
   const handleBooking = async (e) => {
     e.preventDefault();
@@ -166,7 +188,12 @@ const BookingWizard = () => {
                     )}
                     {availableDocs.map(doc => (
                       <div key={doc.id} onClick={() => setBookingData({...bookingData, doctorId: doc.id, dept: doc.deptId})} className={`p-4 rounded-xl border-2 cursor-pointer transition-all flex items-center gap-4 ${bookingData.doctorId === doc.id ? 'border-blue-600 bg-blue-50 shadow-md ring-1 ring-blue-600' : 'border-slate-100 hover:border-blue-300 hover:shadow-sm'}`}>
-                        <div className="text-5xl bg-white rounded-full p-2 shadow-sm border border-slate-100">{doc.avatar}</div>
+                        <div className={`flex h-20 w-20 items-center justify-center rounded-[1.5rem] border bg-gradient-to-br ${getDoctorTone(doc)}`}>
+                          <div className="text-center">
+                            <div className="text-2xl font-black tracking-tight">{getDoctorInitials(doc.name)}</div>
+                            <div className="mt-1 text-[10px] font-bold uppercase tracking-[0.18em] opacity-70">Bác sĩ</div>
+                          </div>
+                        </div>
                         <div className="flex-1">
                           <div className="font-bold text-slate-800 text-lg">{doc.name}</div>
                           <div className="text-sm text-blue-700 font-semibold">{doc.title}</div>

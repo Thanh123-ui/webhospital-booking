@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './services/AuthContext';
 import PatientNavbar from './components/layout/PatientNavbar';
 import PatientHome from './pages/patient/PatientHome';
+import DepartmentsPage from './pages/patient/DepartmentsPage';
 import BookingWizard from './pages/patient/BookingWizard';
 import PatientTracking from './pages/patient/PatientTracking';
 import PatientAuth from './pages/patient/PatientAuth';
@@ -28,6 +29,7 @@ function App() {
               <main className="flex-1 relative w-full">
                 <Routes>
                   <Route path="/" element={<PatientHome />} />
+                  <Route path="/departments" element={<DepartmentsPage />} />
                   <Route
                     path="/book"
                     element={

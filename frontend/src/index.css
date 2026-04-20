@@ -3,8 +3,52 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    color-scheme: light;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
   body {
-    @apply antialiased text-slate-900 bg-white;
+    @apply antialiased bg-background text-on-surface font-body;
+    background-image:
+      radial-gradient(circle at top right, rgba(173, 238, 240, 0.35), transparent 26rem),
+      linear-gradient(180deg, #fafaf5 0%, #edefe8 100%);
+  }
+
+  a,
+  button {
+    @apply transition-all duration-300;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    @apply font-headline tracking-tight;
+  }
+
+  ::selection {
+    background: rgba(36, 104, 107, 0.18);
+    color: #105b5d;
+  }
+}
+
+@layer components {
+  .page-shell {
+    @apply mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8;
+  }
+
+  .glass-panel {
+    @apply border border-white/70 bg-white/80 shadow-float backdrop-blur-xl;
+  }
+
+  .soft-card {
+    @apply rounded-4xl border border-white/80 bg-surface-container-lowest shadow-soft;
   }
 }
 

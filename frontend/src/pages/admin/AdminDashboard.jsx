@@ -300,71 +300,68 @@ const AdminDashboard = () => {
   // const nonEmergencyDepts = departments.filter(d => !d.isEmergency);
 
   return (
-    <div className="flex h-screen text-slate-800 font-['Inter',sans-serif]" style={{background:'#f0f4fa'}}>
+    <div className="flex min-h-screen bg-[linear-gradient(180deg,#f8f9fa_0%,#eef3f6_100%)] font-body text-on-surface">
 
       {/* ── SIDEBAR ── */}
-      <aside className="w-64 flex flex-col shrink-0 shadow-2xl" style={{background:'linear-gradient(180deg,#0f1f3d 0%,#0d1b35 60%,#0a1628 100%)'}}>
+      <aside className="hidden w-72 shrink-0 flex-col border-r border-white/10 bg-[linear-gradient(180deg,#0f5778_0%,#0b4462_48%,#072c41_100%)] shadow-[0_24px_48px_rgba(4,24,36,0.24)] lg:flex">
         {/* Logo */}
-        <div className="px-5 py-5 flex items-center gap-3" style={{borderBottom:'1px solid rgba(255,255,255,0.07)'}}>
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 shadow-lg" style={{background:'linear-gradient(135deg,#2563eb,#0ea5e9)'}}>
+        <div className="flex items-center gap-3 border-b border-white/10 px-6 py-6">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/16 shadow-lg backdrop-blur-sm">
             <span className="text-white font-black text-lg">+</span>
           </div>
           <div>
-            <div className="text-white font-black text-sm tracking-widest">HOSPITAL</div>
-            <div className="text-sky-400 text-[10px] font-semibold tracking-widest uppercase">Nội Bộ</div>
+            <div className="font-headline text-base font-extrabold tracking-[0.18em] text-white">HOSPITAL</div>
+            <div className="mt-1 text-[10px] font-semibold uppercase tracking-[0.28em] text-cyan-50/90">Bảng điều hành nội bộ</div>
           </div>
         </div>
 
         {/* User info */}
-        <div className="px-4 py-4" style={{borderBottom:'1px solid rgba(255,255,255,0.06)'}}>
-          <div className="flex items-center gap-3 rounded-2xl px-3 py-3" style={{background:'rgba(255,255,255,0.06)'}}>
-            <div className="w-11 h-11 rounded-xl flex items-center justify-center text-xl shrink-0 shadow" style={{background:'linear-gradient(135deg,#1e40af,#2563eb)'}}>
-              {currentStaffUser?.avatar || '👤'}
+        <div className="border-b border-white/10 px-4 py-4">
+          <div className="flex items-center gap-3 rounded-[1.75rem] border border-white/12 bg-white/10 px-4 py-4 backdrop-blur-sm">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-white/20 to-cyan-200/10 text-sm font-black text-white shadow">
+              {currentStaffUser?.avatar || currentStaffUser?.name?.trim()?.charAt(0)?.toUpperCase() || 'N'}
             </div>
             <div className="min-w-0">
-              <div className="text-white font-bold text-sm leading-tight truncate">{currentStaffUser?.name}</div>
+              <div className="truncate text-sm font-bold leading-tight text-white">{currentStaffUser?.name}</div>
               <div className="mt-1.5">
                 <span className={`text-[10px] font-bold px-2.5 py-1 rounded-lg ${roleConfig.bg} ${roleConfig.text}`}>
                   {roleConfig.label}
                 </span>
               </div>
-              {currentDept && <div className="text-[10px] text-sky-400 mt-1.5 font-semibold truncate">📍 {currentDept.name}</div>}
+              {currentDept && <div className="mt-1.5 truncate text-[10px] font-semibold text-cyan-50/90">Khoa: {currentDept.name}</div>}
             </div>
           </div>
         </div>
 
         {/* Nav label */}
-        <div className="px-5 pt-5 pb-2">
-          <span className="text-[9px] font-black uppercase tracking-widest" style={{color:'rgba(148,163,184,0.5)'}}>Menu chính</span>
+        <div className="px-6 pb-2 pt-5">
+          <span className="text-[10px] font-black uppercase tracking-[0.28em] text-cyan-50/70">Điều hướng</span>
         </div>
 
         {/* Nav */}
-        <nav className="flex-1 px-3 space-y-1 overflow-y-auto pb-3">
+        <nav className="flex-1 space-y-1 overflow-y-auto px-4 pb-4">
           {tabs.map(tab => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all relative ${
+              className={`relative flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold transition-all ${
                 activeTab === tab.id
-                  ? 'text-white shadow-lg'
-                  : 'text-slate-500 hover:text-white'
+                  ? 'text-white shadow-[0_16px_32px_rgba(0,0,0,0.18)]'
+                  : 'text-cyan-50/90 hover:bg-white/10 hover:text-white'
               }`}
-              style={activeTab === tab.id ? {background:'linear-gradient(90deg,#2563eb,#1d4ed8)'} : {background:'transparent'}}
+              style={activeTab === tab.id ? {background:'linear-gradient(90deg,#0f79ac,#006592)'} : {background:'transparent'}}
             >
-              {activeTab === tab.id && <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-sky-400 rounded-r-full"/>}
+              {activeTab === tab.id && <span className="absolute left-0 top-1/2 h-6 w-1 -translate-y-1/2 rounded-r-full bg-cyan-200"/>}
               {tab.icon} {tab.label}
             </button>
           ))}
         </nav>
 
         {/* Logout */}
-        <div className="p-3" style={{borderTop:'1px solid rgba(255,255,255,0.06)'}}>
+        <div className="border-t border-white/10 p-4">
           <button
             onClick={logout}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all"
-            style={{color:'#f87171'}}
-            onMouseEnter={e=>e.currentTarget.style.background='rgba(239,68,68,0.1)'}
-            onMouseLeave={e=>e.currentTarget.style.background='transparent'}
+            className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold text-rose-200 transition-all hover:bg-rose-400/10 hover:text-white"
           >
             <LogOut size={17} /> Đăng xuất
           </button>
@@ -372,47 +369,76 @@ const AdminDashboard = () => {
       </aside>
 
       {/* ── MAIN ── */}
-      <main className="flex-1 overflow-auto bg-slate-50">
+      <main className="flex-1 overflow-auto">
         {/* Top bar */}
-        <div className="bg-white border-b border-slate-100 px-8 py-4 flex justify-between items-center sticky top-0 z-20" style={{boxShadow:'0 1px 12px rgba(0,0,0,0.06)'}}>
+        <div className="sticky top-0 z-20 border-b border-white/60 bg-white/80 px-5 py-4 shadow-[0_10px_30px_rgba(0,0,0,0.04)] backdrop-blur-xl md:px-8">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-4">
             <div>
-              <h1 className="text-lg font-black text-slate-800 flex items-center gap-2">
+              <h1 className="flex items-center gap-2 font-headline text-xl font-extrabold tracking-tight text-on-surface">
                 {tabs.find(t => t.id === activeTab)?.label}
                 {currentDept && activeTab === 'list' && (
-                  <span className="text-xs font-bold px-2.5 py-1 bg-blue-50 text-blue-600 rounded-lg border border-blue-100">{currentDept.name}</span>
+                  <span className="rounded-full border border-primary/10 bg-primary-container/55 px-3 py-1 text-xs font-bold text-primary">{currentDept.name}</span>
                 )}
               </h1>
-              <p className="text-xs text-slate-400 mt-0.5 flex items-center gap-1">
+              <p className="mt-1 flex items-center gap-1 text-xs text-on-surface-variant">
                 <span>🗓</span> {new Date().toLocaleDateString('vi-VN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {isEmergencyDept && (
-              <div className="flex items-center gap-2 bg-red-600 text-white px-3 py-2 rounded-xl text-xs font-bold shadow-lg shadow-red-200 animate-pulse">
+              <div className="flex items-center gap-2 rounded-2xl bg-red-600 px-3 py-2 text-xs font-bold text-white shadow-lg shadow-red-200 animate-pulse">
                 <AlertTriangle size={13}/> 🚨 Khoa Cấp cứu
               </div>
             )}
             {role === 'NURSE' && !isEmergencyDept && (
-              <div className="flex items-center gap-2 bg-teal-500 text-white px-3 py-2 rounded-xl text-xs font-bold shadow-sm">
+              <div className="flex items-center gap-2 rounded-2xl bg-teal-500 px-3 py-2 text-xs font-bold text-white shadow-sm">
                 <Shield size={13}/> Điều dưỡng · {currentDept?.name}
               </div>
             )}
             {role === 'RECEPTIONIST' && (
-              <div className="flex items-center gap-2 bg-indigo-500 text-white px-3 py-2 rounded-xl text-xs font-bold shadow-sm">
+              <div className="flex items-center gap-2 rounded-2xl bg-indigo-500 px-3 py-2 text-xs font-bold text-white shadow-sm">
                 <Shield size={13}/> Lễ tân
               </div>
             )}
             {role === 'BOD' && (
-              <div className="flex items-center gap-2 bg-amber-500 text-white px-3 py-2 rounded-xl text-xs font-bold shadow-sm">
+              <div className="flex items-center gap-2 rounded-2xl bg-amber-500 px-3 py-2 text-xs font-bold text-white shadow-sm">
                 <Shield size={13}/> Ban Giám Đốc
               </div>
             )}
           </div>
         </div>
 
-        <div className="p-8">
+          <div className="mt-4 flex gap-2 overflow-x-auto pb-1 lg:hidden">
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex shrink-0 items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition ${
+                  activeTab === tab.id
+                    ? 'bg-primary text-on-primary shadow-md'
+                    : 'bg-surface-container text-on-surface-variant'
+                }`}
+              >
+                {tab.icon}
+                <span>{tab.label}</span>
+              </button>
+            ))}
+
+            <button
+              type="button"
+              onClick={logout}
+              className="flex shrink-0 items-center gap-2 rounded-full bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-600"
+            >
+              <LogOut size={16} />
+              <span>Đăng xuất</span>
+            </button>
+          </div>
+        </div>
+
+        <div className="p-5 md:p-8">
 
           {/* ── TAB: Appointments ── */}
           {activeTab === 'list' && (
@@ -425,7 +451,7 @@ const AdminDashboard = () => {
                   { label: 'Đã hoàn tất',    value: stats.done,     color: 'from-green-600 to-teal-500',  icon: <Check size={22} className="text-white/80"/> },
                   { label: 'Cấp cứu',        value: stats.emergency, color: 'from-red-600 to-rose-500',    icon: <AlertTriangle size={22} className="text-white/80"/> },
                 ].map((s, i) => (
-                  <div key={i} className={`bg-gradient-to-br ${s.color} rounded-2xl p-5 text-white shadow-lg`}>
+                  <div key={i} className={`rounded-[1.75rem] bg-gradient-to-br ${s.color} p-5 text-white shadow-[0_18px_36px_rgba(0,0,0,0.08)]`}>
                     <div className="flex justify-between items-start mb-3">
                       <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">{s.icon}</div>
                       {s.value > 0 && i === 3 && <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full font-bold animate-pulse">🚨 Hoạt động</span>}
@@ -436,30 +462,30 @@ const AdminDashboard = () => {
                 ))}
               </div>
 
-              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+              <div className="overflow-hidden rounded-[2rem] border border-white/80 bg-surface-container-lowest shadow-[0_12px_32px_rgba(0,0,0,0.05)]">
                 {/* Filter bar */}
-                <div className="px-6 py-4 border-b border-slate-100 flex flex-col md:flex-row justify-between items-center bg-slate-50/80 gap-3">
-                  <div className="text-sm font-bold text-slate-600">📅 Danh sách lịch khám hôm nay</div>
+                <div className="flex flex-col items-start justify-between gap-3 border-b border-surface-variant/30 bg-surface-container-low/70 px-6 py-5 md:flex-row md:items-center">
+                  <div className="text-sm font-bold text-on-surface-variant">📅 Danh sách lịch khám hôm nay</div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <input type="date" className="text-xs px-3 py-2 border border-slate-200 rounded-xl outline-none text-slate-600 bg-white focus:ring-2 focus:ring-blue-400" value={apptDateFilter} onChange={e=>setApptDateFilter(e.target.value)} />
-                    <select className="text-xs px-3 py-2 border border-slate-200 rounded-xl outline-none text-slate-600 bg-white focus:ring-2 focus:ring-blue-400" value={apptTimeFilter} onChange={e=>setApptTimeFilter(e.target.value)}>
+                    <input type="date" className="rounded-2xl border border-surface-variant/50 bg-white px-3 py-2.5 text-sm text-on-surface outline-none focus:ring-2 focus:ring-primary/20" value={apptDateFilter} onChange={e=>setApptDateFilter(e.target.value)} />
+                    <select className="rounded-2xl border border-surface-variant/50 bg-white px-3 py-2.5 text-sm text-on-surface outline-none focus:ring-2 focus:ring-primary/20" value={apptTimeFilter} onChange={e=>setApptTimeFilter(e.target.value)}>
                       <option value="">Tất cả giờ</option>
                       {[...new Set(visibleAppointments.map(a => a.time).filter(Boolean))].sort().map(t=><option key={t} value={t}>{t}</option>)}
                     </select>
                     {!currentDept && (
-                      <select className="text-xs px-3 py-2 border border-slate-200 rounded-xl outline-none text-slate-600 bg-white focus:ring-2 focus:ring-blue-400" value={apptDeptFilter} onChange={e=>setApptDeptFilter(e.target.value)}>
+                      <select className="rounded-2xl border border-surface-variant/50 bg-white px-3 py-2.5 text-sm text-on-surface outline-none focus:ring-2 focus:ring-primary/20" value={apptDeptFilter} onChange={e=>setApptDeptFilter(e.target.value)}>
                         <option value="">Tất cả chuyên khoa</option>
                         {departments.map(d=><option key={d.id} value={d.id}>{d.name}</option>)}
                       </select>
                     )}
                     {(apptDateFilter || apptTimeFilter || apptDeptFilter) && (
-                      <button onClick={() => { setApptDateFilter(''); setApptTimeFilter(''); setApptDeptFilter(''); }} className="text-xs px-3 py-2 bg-red-50 text-red-600 border border-red-200 rounded-xl font-bold hover:bg-red-100 transition">Xóa bộ lọc</button>
+                      <button onClick={() => { setApptDateFilter(''); setApptTimeFilter(''); setApptDeptFilter(''); }} className="rounded-2xl border border-red-200 bg-red-50 px-3 py-2.5 text-sm font-bold text-red-600 transition hover:bg-red-100">Xóa bộ lọc</button>
                     )}
                   </div>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-sm">
-                    <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider">
+                    <thead className="bg-surface-container-low text-xs uppercase tracking-wider text-on-surface-variant">
                       <tr>
                         <th className="px-5 py-4 font-bold">Mã</th>
                         <th className="px-5 py-4 font-bold">Bệnh nhân</th>
@@ -476,7 +502,7 @@ const AdminDashboard = () => {
                         return (
                           <tr
                             key={appt.id}
-                            className={`transition hover:bg-blue-50/30 ${
+                            className={`transition hover:bg-sky-50/40 ${
                               appt.is_emergency || appt.status === 'EMERGENCY'
                                 ? 'bg-red-50 border-l-4 border-red-500'
                                 : appt.status === 'TRANSFER_PENDING'
@@ -562,15 +588,15 @@ const AdminDashboard = () => {
           {/* ── TAB: Patients ── */}
           {activeTab === 'patients' && PERMS.canViewPatients(role) && (
             <div className="animate-in fade-in">
-              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center gap-4">
-                  <span className="font-bold text-slate-700">
+              <div className="overflow-hidden rounded-[2rem] border border-white/80 bg-surface-container-lowest shadow-[0_12px_32px_rgba(0,0,0,0.05)]">
+                <div className="flex flex-col justify-between gap-4 border-b border-surface-variant/30 px-6 py-5 md:flex-row md:items-center">
+                  <span className="font-bold text-on-surface">
                     {searchTerm ? `${filteredPatients.length}/${patients.length}` : patients.length} bệnh nhân
                   </span>
                   <div className="relative">
                     <input
                       type="text"
-                      className="w-64 pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-slate-50"
+                      className="w-full rounded-2xl border border-surface-variant/50 bg-surface-container-low py-3 pl-10 pr-4 text-base outline-none focus:ring-2 focus:ring-primary/20 md:w-72"
                       placeholder="Tìm theo mã BN, tên hoặc SĐT..."
                       value={searchTerm}
                       onChange={e => setSearchTerm(e.target.value)}
@@ -580,7 +606,7 @@ const AdminDashboard = () => {
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-sm">
-                    <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider">
+                    <thead className="bg-surface-container-low text-xs uppercase tracking-wider text-on-surface-variant">
                       <tr>
                         <th className="px-6 py-4 font-bold">Mã BN</th>
                         <th className="px-6 py-4 font-bold">Thông tin</th>
@@ -642,9 +668,9 @@ const AdminDashboard = () => {
                 {/* Add form — ADMIN + BOD */}
                 {PERMS.canAddStaff(role) && (
                   <div className="md:col-span-1">
-                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-                      <h3 className="font-bold text-base mb-5 flex items-center gap-2 pb-4 border-b border-slate-100">
-                        <UserPlus size={18} className="text-blue-600" /> Thêm tài khoản mới
+                    <div className="rounded-[2rem] border border-white/80 bg-surface-container-lowest p-6 shadow-[0_12px_32px_rgba(0,0,0,0.05)]">
+                      <h3 className="mb-5 flex items-center gap-2 border-b border-surface-variant/30 pb-4 font-headline text-lg font-bold text-on-surface">
+                        <UserPlus size={18} className="text-primary" /> Thêm tài khoản mới
                       </h3>
                       {role === 'BOD' && (
                         <div className="mb-4 bg-amber-50 border border-amber-200 text-amber-800 rounded-xl px-4 py-2.5 text-xs font-semibold flex items-center gap-2">
@@ -654,21 +680,21 @@ const AdminDashboard = () => {
                       <form onSubmit={handleAddStaff} className="space-y-4">
                         <div>
                           <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">Họ và Tên</label>
-                          <input required type="text" className="w-full p-3 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none" value={newStaff.name} onChange={e => setNewStaff({...newStaff, name: e.target.value})} placeholder="VD: BS. Nguyễn Văn A" />
+                          <input required type="text" className="w-full rounded-2xl border border-surface-variant/50 bg-surface-container-low p-3 text-base outline-none focus:ring-2 focus:ring-primary/20" value={newStaff.name} onChange={e => setNewStaff({...newStaff, name: e.target.value})} placeholder="VD: BS. Nguyễn Văn A" />
                         </div>
                         <div>
                           <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">Chức danh</label>
-                          <input required type="text" className="w-full p-3 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none" value={newStaff.title} onChange={e => setNewStaff({...newStaff, title: e.target.value})} placeholder="VD: Thạc sĩ, Bác sĩ CKI" />
+                          <input required type="text" className="w-full rounded-2xl border border-surface-variant/50 bg-surface-container-low p-3 text-base outline-none focus:ring-2 focus:ring-primary/20" value={newStaff.title} onChange={e => setNewStaff({...newStaff, title: e.target.value})} placeholder="VD: Thạc sĩ, Bác sĩ CKI" />
                         </div>
                         {(newStaff.role === 'DOCTOR') && (
                           <div>
                             <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">Kinh nghiệm</label>
-                            <input type="text" className="w-full p-3 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none" value={newStaff.exp} onChange={e => setNewStaff({...newStaff, exp: e.target.value})} placeholder="VD: 10 năm" />
+                            <input type="text" className="w-full rounded-2xl border border-surface-variant/50 bg-surface-container-low p-3 text-base outline-none focus:ring-2 focus:ring-primary/20" value={newStaff.exp} onChange={e => setNewStaff({...newStaff, exp: e.target.value})} placeholder="VD: 10 năm" />
                           </div>
                         )}
                         <div>
                           <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">Vai trò</label>
-                          <select className="w-full p-3 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none" value={newStaff.role} onChange={e => setNewStaff({...newStaff, role: e.target.value, deptId: ''})}>
+                          <select className="w-full rounded-2xl border border-surface-variant/50 bg-surface-container-low p-3 text-base outline-none focus:ring-2 focus:ring-primary/20" value={newStaff.role} onChange={e => setNewStaff({...newStaff, role: e.target.value, deptId: ''})}>
                             <option value="DOCTOR">Bác sĩ</option>
                             <option value="NURSE">Điều dưỡng</option>
                             <option value="RECEPTIONIST">Lễ tân</option>
@@ -678,28 +704,28 @@ const AdminDashboard = () => {
                         {(newStaff.role === 'DOCTOR' || newStaff.role === 'NURSE') && (
                           <div>
                             <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">Chuyên khoa / Phòng ban</label>
-                            <select required className="w-full p-3 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none" value={newStaff.deptId} onChange={e => setNewStaff({...newStaff, deptId: e.target.value})}>
+                            <select required className="w-full rounded-2xl border border-surface-variant/50 bg-surface-container-low p-3 text-base outline-none focus:ring-2 focus:ring-primary/20" value={newStaff.deptId} onChange={e => setNewStaff({...newStaff, deptId: e.target.value})}>
                               <option value="">-- Chọn Khoa --</option>
                               {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
                             </select>
                           </div>
                         )}
-                        <div className="bg-slate-50 rounded-xl p-4 space-y-3 border border-slate-100">
+                        <div className="space-y-3 rounded-[1.5rem] border border-surface-variant/30 bg-surface-container-low p-4">
                           <div>
                             <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">Tên đăng nhập</label>
-                            <input required type="text" className="w-full p-3 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white" value={newStaff.username} onChange={e => setNewStaff({...newStaff, username: e.target.value})} placeholder="username" />
+                            <input required type="text" className="w-full rounded-2xl border border-surface-variant/50 bg-white p-3 text-base outline-none focus:ring-2 focus:ring-primary/20" value={newStaff.username} onChange={e => setNewStaff({...newStaff, username: e.target.value})} placeholder="username" />
                           </div>
                           <div>
                             <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wider">Mật khẩu</label>
                             <div className="relative">
-                              <input required type={showNewPass ? 'text' : 'password'} className="w-full p-3 pr-10 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white" value={newStaff.password} onChange={e => setNewStaff({...newStaff, password: e.target.value})} placeholder="Đặt mật khẩu riêng..." />
+                              <input required type={showNewPass ? 'text' : 'password'} className="w-full rounded-2xl border border-surface-variant/50 bg-white p-3 pr-10 text-base outline-none focus:ring-2 focus:ring-primary/20" value={newStaff.password} onChange={e => setNewStaff({...newStaff, password: e.target.value})} placeholder="Đặt mật khẩu riêng..." />
                               <button type="button" onClick={() => setShowNewPass(!showNewPass)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">
                                 {showNewPass ? <EyeOff size={16}/> : <Eye size={16}/>}
                               </button>
                             </div>
                           </div>
                         </div>
-                        <button type="submit" className="w-full bg-blue-700 text-white font-bold py-3 rounded-xl hover:bg-blue-800 transition text-sm shadow">
+                        <button type="submit" className="w-full rounded-2xl bg-gradient-to-r from-primary to-primary-dim py-3.5 text-base font-bold text-on-primary shadow-[0_12px_24px_rgba(0,101,146,0.18)] transition hover:brightness-110">
                           Tạo tài khoản
                         </button>
                       </form>
@@ -716,15 +742,15 @@ const AdminDashboard = () => {
                       </div>
                     ) : (
                       <div className="w-full relative">
-                        <input type="text" placeholder="Tìm kiếm theo Tên hoặc Tài khoản..." className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500" value={staffSearchQuery} onChange={e=>setStaffSearchQuery(e.target.value)} />
+                        <input type="text" placeholder="Tìm kiếm theo tên hoặc tài khoản..." className="w-full rounded-2xl border border-surface-variant/50 bg-surface-container-low py-3 pl-10 pr-4 text-base outline-none focus:ring-2 focus:ring-primary/20" value={staffSearchQuery} onChange={e=>setStaffSearchQuery(e.target.value)} />
                         <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
                       </div>
                     )}
                   </div>
-                  <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                  <div className="overflow-hidden rounded-[2rem] border border-white/80 bg-surface-container-lowest shadow-[0_12px_32px_rgba(0,0,0,0.05)]">
                     <div className="overflow-x-auto">
                       <table className="w-full text-left text-sm">
-                        <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider">
+                        <thead className="bg-surface-container-low text-xs uppercase tracking-wider text-on-surface-variant">
                           <tr>
                             <th className="px-6 py-4 font-bold">Tài khoản</th>
                             <th className="px-6 py-4 font-bold">Họ và Tên</th>
@@ -811,12 +837,12 @@ const AdminDashboard = () => {
           {/* ── TAB: Logs ── */}
           {activeTab === 'logs' && PERMS.canViewLogs(role) && (
             <div className="animate-in fade-in">
-              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                <div className="px-6 py-4 border-b border-slate-100">
-                  <span className="font-bold text-slate-700">{logsList.length} bản ghi</span>
+              <div className="overflow-hidden rounded-[2rem] border border-white/80 bg-surface-container-lowest shadow-[0_12px_32px_rgba(0,0,0,0.05)]">
+                <div className="border-b border-surface-variant/30 px-6 py-5">
+                  <span className="font-bold text-on-surface">{logsList.length} bản ghi</span>
                 </div>
                 <table className="w-full text-left text-sm">
-                  <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider">
+                  <thead className="bg-surface-container-low text-xs uppercase tracking-wider text-on-surface-variant">
                     <tr>
                       <th className="px-6 py-4 font-bold w-1/4">Thời gian</th>
                       <th className="px-6 py-4 font-bold">Hành động</th>
@@ -1101,18 +1127,18 @@ const AdminDashboard = () => {
       
       {/* Reset Mật Khẩu Staff Modal */}
       {resetPassModal && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-          <form onSubmit={handleResetPassword} className="bg-white rounded-3xl shadow-2xl p-6 w-full max-w-sm animate-in zoom-in-95">
-            <h3 className="text-lg font-bold text-slate-800 mb-2 flex items-center gap-2 border-b pb-4">
-              <Key size={18} className="text-blue-600"/> Cấp lại Mật khẩu
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm">
+          <form onSubmit={handleResetPassword} className="w-full max-w-sm animate-in zoom-in-95 rounded-[2rem] border border-white/80 bg-surface-container-lowest p-6 shadow-[0_24px_48px_rgba(0,0,0,0.16)]">
+            <h3 className="mb-2 flex items-center gap-2 border-b border-surface-variant/30 pb-4 font-headline text-xl font-bold text-on-surface">
+              <Key size={18} className="text-primary"/> Cấp lại mật khẩu
             </h3>
             <div className="mb-6 mt-4">
-               <label className="block text-xs font-bold text-slate-700 mb-2">Mật khẩu cấp mới</label>
-               <input required type="text" className="w-full p-3 border border-slate-300 rounded-xl outline-none focus:ring-2 focus:ring-blue-500" value={resetPassValue} onChange={e=>setResetPassValue(e.target.value)} placeholder="Nhập vào mật khẩu mới..." />
+               <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-on-surface-variant">Mật khẩu cấp mới</label>
+               <input required type="text" className="w-full rounded-2xl border border-surface-variant/50 bg-surface-container-low p-3 text-base outline-none focus:ring-2 focus:ring-primary/20" value={resetPassValue} onChange={e=>setResetPassValue(e.target.value)} placeholder="Nhập mật khẩu mới..." />
             </div>
             <div className="flex gap-3">
-              <button type="button" onClick={() => { setResetPassModal(null); setResetPassValue(''); }} className="flex-1 py-3 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition">Hủy bỏ</button>
-              <button type="submit" className="flex-1 py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition">Lưu cập nhật</button>
+              <button type="button" onClick={() => { setResetPassModal(null); setResetPassValue(''); }} className="flex-1 rounded-2xl bg-slate-100 py-3 text-base font-bold text-slate-600 transition hover:bg-slate-200">Hủy bỏ</button>
+              <button type="submit" className="flex-1 rounded-2xl bg-gradient-to-r from-primary to-primary-dim py-3 text-base font-bold text-on-primary transition hover:brightness-110">Lưu cập nhật</button>
             </div>
           </form>
         </div>
@@ -1120,13 +1146,13 @@ const AdminDashboard = () => {
 
       {/* ── TOAST (To hơn, có loại emergency) ── */}
       {toast && (
-        <div className={`fixed bottom-6 right-6 px-7 py-5 rounded-2xl shadow-2xl flex items-center gap-4 z-50 animate-in slide-in-from-bottom-4 max-w-sm ${
+        <div className={`fixed bottom-4 right-4 z-50 flex max-w-[calc(100vw-2rem)] items-start gap-4 rounded-[1.75rem] px-5 py-4 shadow-2xl animate-in slide-in-from-bottom-4 sm:bottom-6 sm:right-6 sm:max-w-md ${
           toastType === 'emergency'
             ? 'bg-red-700 text-white'
             : 'bg-slate-900 text-white'
         }`}>
           <div className={`w-3 h-3 rounded-full shrink-0 animate-pulse ${toastType === 'emergency' ? 'bg-yellow-300' : 'bg-green-400'}`}></div>
-          <span className="font-bold text-base leading-snug">{toast}</span>
+          <span className="min-w-0 break-words text-sm font-bold leading-6 sm:text-base">{toast}</span>
           <button onClick={() => setToast(null)} className="ml-2 text-white/60 hover:text-white transition shrink-0">
             <X size={16}/>
           </button>

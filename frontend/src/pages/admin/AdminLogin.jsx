@@ -1,11 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Lock, Eye, EyeOff, ArrowLeft, ShieldCheck } from 'lucide-react';
+import { Lock, Eye, EyeOff, ArrowRight, ShieldAlert, Mail, Cross } from 'lucide-react';
 import { useAuth } from '../../services/AuthContext';
 import { api } from '../../services/api';
-import HospitalStatsGrid from '../../components/shared/HospitalStatsGrid';
-import EmergencyCard from '../../components/shared/EmergencyCard';
-import { HOSPITAL_COPYRIGHT } from '../../utils/constants';
 
 const AdminLogin = () => {
   const navigate = useNavigate();
@@ -20,6 +17,7 @@ const AdminLogin = () => {
     e.preventDefault();
     setLoading(true);
     setError('');
+
     try {
       const res = await api.loginStaff(username, password);
       if (res.data.success) {
@@ -28,148 +26,160 @@ const AdminLogin = () => {
         navigate('/admin/dashboard');
       }
     } catch (err) {
-      setError(err.response?.data?.message || err.message || 'Lỗi kết nối đến máy chủ. Vui lòng kiểm tra Backend.');
+      setError(err.response?.data?.message || err.message || 'Lỗi kết nối đến máy chủ. Vui lòng kiểm tra backend.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex font-['Inter',sans-serif] bg-slate-950">
-      {/* ── LEFT PANEL ── */}
-      <div className="hidden lg:flex lg:w-[55%] relative flex-col justify-between p-14 overflow-hidden"
-        style={{background: 'linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #0c4a6e 100%)'}}>
+    <div className="flex min-h-screen flex-col bg-background text-on-background md:flex-row">
+      <div className="relative hidden w-1/2 overflow-hidden bg-primary md:flex md:flex-col">
+        <div className="absolute inset-0 z-10 bg-primary/20 mix-blend-multiply" />
+        <img
+          alt="Không gian bệnh viện hiện đại"
+          className="absolute inset-0 z-0 h-full w-full object-cover opacity-80"
+          src="https://images.unsplash.com/photo-1586773860418-d37222d8fce3?auto=format&fit=crop&w=1600&q=80"
+        />
 
-        {/* Animated background shapes */}
-        <div className="absolute inset-0 overflow-hidden">
-          <div className="absolute -top-40 -right-40 w-96 h-96 rounded-full opacity-20"
-            style={{background:'radial-gradient(circle, #38bdf8, transparent)'}}/>
-          <div className="absolute top-1/3 -left-24 w-80 h-80 rounded-full opacity-10"
-            style={{background:'radial-gradient(circle, #818cf8, transparent)'}}/>
-          <div className="absolute -bottom-20 right-20 w-72 h-72 rounded-full opacity-15"
-            style={{background:'radial-gradient(circle, #34d399, transparent)'}}/>
-          {/* Grid lines */}
-          <div className="absolute inset-0 opacity-[0.04]"
-            style={{backgroundImage:'linear-gradient(#fff 1px,transparent 1px),linear-gradient(90deg,#fff 1px,transparent 1px)',backgroundSize:'60px 60px'}}/>
-        </div>
-
-        {/* Content */}
-        <div className="relative z-10">
-          <div className="flex items-center gap-3 mb-16">
-            <div className="w-12 h-12 bg-white/10 rounded-2xl border border-white/20 backdrop-blur flex items-center justify-center shadow-lg">
-              <span className="text-white font-black text-2xl">+</span>
+        <div className="relative z-20 flex h-full flex-col justify-between p-12">
+          <div className="flex items-center gap-3">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white/16 text-on-primary backdrop-blur-sm">
+              <Cross size={26} strokeWidth={2.4} />
             </div>
             <div>
-              <span className="text-white font-black text-xl tracking-widest">HOSPITAL</span>
-              <div className="text-sky-400 text-[10px] font-semibold tracking-widest uppercase">Management System</div>
+              <h1 className="font-headline text-2xl font-extrabold tracking-tight text-on-primary">Hospital Admin</h1>
+              <p className="mt-1 text-sm uppercase tracking-[0.22em] text-on-primary/80">Hệ thống quản trị thông minh</p>
             </div>
           </div>
 
-          <h1 className="text-5xl font-black text-white leading-tight mb-6">
-            Cổng Quản lý<br />
-            <span className="text-transparent bg-clip-text"
-              style={{backgroundImage:'linear-gradient(90deg, #38bdf8, #818cf8)'}}>
-              Nội Bộ
-            </span>
-          </h1>
-          <p className="text-slate-400 text-base leading-relaxed max-w-sm mb-12">
-            Hệ thống quản lý tập trung, phân quyền chặt chẽ dành cho toàn thể cán bộ, nhân viên y tế.
-          </p>
-
-          {/* Stats grid — đồng bộ với trang chủ bệnh nhân */}
-          <HospitalStatsGrid />
-          <EmergencyCard />
-        </div>
-
-        <div className="relative z-10 text-slate-600 text-xs">
-          {HOSPITAL_COPYRIGHT}
+          <div className="max-w-md">
+            <h2 className="mb-6 font-headline text-5xl font-semibold leading-tight text-on-primary">
+              Kiến tạo sự an tâm trong từng thao tác.
+            </h2>
+            <div className="mb-8 h-1 w-16 rounded-full bg-on-primary/30" />
+            <p className="text-lg font-light leading-relaxed text-on-primary/90">
+              Hệ thống nội bộ bảo mật cao, thiết kế tối giản dành riêng cho quy trình làm việc chặt chẽ của đội ngũ y tế và quản trị.
+            </p>
+          </div>
         </div>
       </div>
 
-      {/* ── RIGHT PANEL ── */}
-      <div className="flex-1 flex items-center justify-center p-8" style={{background:'#0f172a'}}>
-        <div className="w-full max-w-md">
-          {/* Mobile logo */}
-          <div className="lg:hidden flex items-center gap-2 mb-8 justify-center">
-            <div className="w-10 h-10 rounded-xl border border-white/20 flex items-center justify-center">
-              <span className="text-white font-black text-lg">+</span>
-            </div>
-            <span className="text-white font-black text-xl tracking-widest">HOSPITAL</span>
+      <div className="relative flex flex-1 flex-col justify-between overflow-y-auto bg-surface-container-lowest">
+        <div className="flex items-center justify-between border-b border-surface-variant/30 p-6 md:hidden">
+          <div className="flex items-center gap-2">
+            <Cross size={24} className="text-primary" strokeWidth={2.4} />
+            <span className="font-headline text-lg font-extrabold tracking-tight text-primary">Hospital Admin</span>
           </div>
+        </div>
 
-          {/* Card */}
-          <div className="rounded-3xl border border-white/10 p-10 shadow-2xl"
-            style={{background:'linear-gradient(150deg, #1e293b 0%, #0f172a 100%)'}}>
-
-            {/* Header */}
-            <div className="mb-8 text-center">
-              <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-5 shadow-xl"
-                style={{background:'linear-gradient(135deg, #2563eb, #0ea5e9)'}}>
-                <Lock size={26} className="text-white" />
-              </div>
-              <h2 className="text-2xl font-black text-white">Đăng nhập Nội Bộ</h2>
-              <p className="text-slate-500 text-sm mt-1.5">Vui lòng sử dụng tài khoản được cấp</p>
+        <div className="flex flex-1 items-center justify-center p-8 md:p-16 lg:p-24">
+          <div className="w-full max-w-md space-y-10">
+            <div className="space-y-3">
+              <h2 className="font-headline text-3xl font-semibold tracking-tight text-on-surface">Đăng nhập hệ thống</h2>
+              <p className="text-base text-on-surface-variant">Hệ thống quản trị nội bộ dành cho nhân viên y tế.</p>
             </div>
 
-            {/* Error */}
-            {error && (
-              <div className="bg-red-950/60 border border-red-800/60 text-red-400 p-4 rounded-2xl text-sm mb-6 flex items-center gap-3 font-medium">
-                <ShieldCheck size={18} className="shrink-0 text-red-500" />
+            {error ? (
+              <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
                 {error}
               </div>
-            )}
+            ) : null}
 
-            <form onSubmit={handleLogin} className="space-y-5">
-              <div>
-                <label className="block text-sm font-bold text-slate-400 mb-2 uppercase tracking-wider text-xs">Tên đăng nhập</label>
-                <input
-                  required type="text"
-                  className="w-full p-4 rounded-xl outline-none transition text-white font-medium placeholder-slate-600 border border-white/10 focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
-                  style={{background:'rgba(255,255,255,0.05)'}}
-                  value={username}
-                  onChange={e => setUsername(e.target.value)}
-                  placeholder="Nhập username..."
-                  autoComplete="username"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-bold text-slate-400 mb-2 uppercase tracking-wider text-xs">Mật khẩu</label>
+            <form onSubmit={handleLogin} className="space-y-6">
+              <div className="space-y-2">
+                  <label className="block text-sm font-medium text-on-surface" htmlFor="email">
+                    Tên đăng nhập / Email
+                  </label>
                 <div className="relative">
+                  <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4">
+                    <Mail size={18} className="text-on-surface-variant/70" />
+                  </div>
                   <input
+                    id="email"
+                    type="text"
                     required
-                    type={showPass ? 'text' : 'password'}
-                    className="w-full p-4 pr-12 rounded-xl outline-none transition text-white font-medium placeholder-slate-600 border border-white/10 focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
-                    style={{background:'rgba(255,255,255,0.05)'}}
-                    value={password}
-                    onChange={e => setPassword(e.target.value)}
-                    placeholder="Mật khẩu cá nhân..."
-                    autoComplete="current-password"
+                    autoComplete="username"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    placeholder="nhanvien@hospital.vn"
+                    className="block w-full rounded-2xl border-none bg-surface-container-low py-3.5 pl-11 pr-4 text-base text-on-surface placeholder:text-on-surface-variant/50 transition-all duration-200 focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary/20"
                   />
-                  <button type="button" onClick={() => setShowPass(!showPass)}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-sky-400 transition">
-                    {showPass ? <EyeOff size={20}/> : <Eye size={20}/>}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                  <label className="block text-sm font-medium text-on-surface" htmlFor="password">
+                    Mật khẩu
+                  </label>
+                <div className="relative">
+                  <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4">
+                    <Lock size={18} className="text-on-surface-variant/70" />
+                  </div>
+                  <input
+                    id="password"
+                    required
+                    autoComplete="current-password"
+                    type={showPass ? 'text' : 'password'}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="block w-full rounded-2xl border-none bg-surface-container-low py-3.5 pl-11 pr-12 text-base text-on-surface placeholder:text-on-surface-variant/50 transition-all duration-200 focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary/20"
+                  />
+                  <button
+                    type="button"
+                    className="absolute inset-y-0 right-0 flex items-center pr-4 text-on-surface-variant hover:text-on-surface"
+                    onClick={() => setShowPass(!showPass)}
+                  >
+                    {showPass ? <EyeOff size={18} /> : <Eye size={18} />}
                   </button>
                 </div>
-
               </div>
 
-              <button type="submit" disabled={loading}
-                className="w-full py-4 rounded-xl font-black text-white text-base shadow-xl transition-all mt-2 flex items-center justify-center gap-2 disabled:opacity-60"
-                style={{background:'linear-gradient(135deg, #2563eb, #0ea5e9)', boxShadow:'0 8px 30px rgba(37,99,235,0.35)'}}>
-                {loading
-                  ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"/>
-                  : <><Lock size={17}/> ĐĂNG NHẬP HỆ THỐNG</>
-                }
-              </button>
+              <div className="flex items-center justify-between pt-2">
+                <div className="flex items-center">
+                  <input
+                    id="remember-me"
+                    type="checkbox"
+                    className="h-4 w-4 rounded border-outline-variant bg-surface-container-low text-primary focus:ring-primary"
+                  />
+                  <label htmlFor="remember-me" className="ml-2 cursor-pointer text-base text-on-surface-variant">
+                    Ghi nhớ đăng nhập
+                  </label>
+                </div>
+                <button
+                  type="button"
+                  className="text-base font-medium text-primary transition-colors hover:text-primary-dim"
+                  onClick={() => setError('Vui lòng liên hệ quản trị viên hệ thống để được cấp lại mật khẩu.')}
+                >
+                  Quên mật khẩu?
+                </button>
+              </div>
+
+              <div className="pt-4">
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-primary to-primary-dim px-6 py-4 font-semibold text-on-primary shadow-sm transition-all duration-300 hover:from-primary-dim hover:to-primary focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:opacity-70"
+                >
+                  <span>{loading ? 'Đang đăng nhập' : 'Đăng nhập'}</span>
+                  <ArrowRight size={18} />
+                </button>
+              </div>
             </form>
 
-            <div className="mt-6 pt-5 border-t border-white/5 text-center">
-              <button onClick={() => navigate('/')}
-                className="text-sm text-slate-600 hover:text-sky-400 font-semibold flex items-center justify-center gap-2 w-full transition">
-                <ArrowLeft size={14}/> Về trang chủ bệnh nhân
-              </button>
+            <div className="mt-8 border-t border-surface-variant/30 pt-8 text-center">
+              <p className="flex items-center justify-center gap-1 text-xs text-on-surface-variant/70">
+                <ShieldAlert size={14} />
+                <span>Được bảo vệ bằng tiêu chuẩn bảo mật nội bộ dành cho hệ thống y tế.</span>
+              </p>
             </div>
           </div>
+        </div>
+
+        <div className="flex flex-col items-center justify-between gap-4 border-t border-surface-container-low bg-surface-container-lowest px-8 py-6 text-xs tracking-wide text-on-surface-variant md:flex-row">
+          <p>© 2026 Hospital.</p>
+          <p>Hệ thống nội bộ - Bảo mật theo tiêu chuẩn quản trị y tế.</p>
         </div>
       </div>
     </div>
