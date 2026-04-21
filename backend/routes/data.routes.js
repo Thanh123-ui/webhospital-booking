@@ -9,6 +9,6 @@ router.get('/doctors', dataController.getDoctors);
 router.get('/schedules', dataController.getSchedules);
 router.post('/rate', dataController.rateDoctor);
 router.get('/ratings', dataController.getTopDoctors);
-router.get('/logs', verifyToken, verifyRole('ADMIN'), (req, res) => res.json(require('../utils/logger').getLogs()));
+router.get('/logs', verifyToken, verifyRole('ADMIN', 'BOD'), (req, res) => res.json(require('../utils/logger').getLogs()));
 
 module.exports = router;

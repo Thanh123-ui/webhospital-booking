@@ -59,11 +59,35 @@ CREATE TABLE IF NOT EXISTS appointments (
   is_emergency BOOLEAN DEFAULT FALSE,
   current_department INT NULL,
   history JSON,
+  rescheduledAt TIMESTAMP NULL,
+  rescheduledBy INT NULL,
+  rescheduledByName VARCHAR(150) NULL,
+  noShowAt TIMESTAMP NULL,
+  noShowBy INT NULL,
+  noShowByName VARCHAR(150) NULL,
+  noShowReason TEXT NULL,
   createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (patientId) REFERENCES patients(id) ON DELETE SET NULL,
   FOREIGN KEY (doctorId) REFERENCES staff(id) ON DELETE SET NULL,
   FOREIGN KEY (deptId) REFERENCES departments(id) ON DELETE SET NULL,
   FOREIGN KEY (current_department) REFERENCES departments(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 4B. BẢNG YÊU CẦU HỖ TRỢ CẤP CỨU
+CREATE TABLE IF NOT EXISTS emergency_requests (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  code VARCHAR(20) UNIQUE NOT NULL,
+  requesterName VARCHAR(150) NOT NULL,
+  phone VARCHAR(20) NOT NULL,
+  symptoms TEXT NOT NULL,
+  location TEXT,
+  status VARCHAR(50) DEFAULT 'PENDING',
+  history JSON,
+  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  handledAt TIMESTAMP NULL,
+  handledBy INT NULL,
+  handledByName VARCHAR(150) NULL,
+  FOREIGN KEY (handledBy) REFERENCES staff(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 5. BẢNG LỊCH LÀM VIỆC CỦA BÁC SĨ (SCHEDULES)

@@ -1,11 +1,20 @@
 const db = require('../data/db');
 
 const NURSE_VISIBLE_STATUSES = new Set([
-    'PENDING',
-    'CONFIRMED',
     'ARRIVED',
     'READY',
     'TRANSFER_PENDING',
+    'COMPLETED',
+    'NO_SHOW',
+    'CANCELED',
+]);
+
+const DOCTOR_VISIBLE_STATUSES = new Set([
+    'READY',
+    'TRANSFER_PENDING',
+    'COMPLETED',
+    'NO_SHOW',
+    'CANCELED',
 ]);
 
 function getEffectiveDeptId(appt, staffList) {
@@ -43,8 +52,9 @@ exports.getAllPatients = async (req, res) => {
             appointments
                 .filter(a => {
                     if (getEffectiveDeptId(a, staffList) !== parsedDeptId) return false;
-                    if (role !== 'NURSE') return true;
-                    return NURSE_VISIBLE_STATUSES.has(a.status);
+                    if (role === 'NURSE') return NURSE_VISIBLE_STATUSES.has(a.status);
+                    if (role === 'DOCTOR') return DOCTOR_VISIBLE_STATUSES.has(a.status);
+                    return true;
                 })
                 .forEach(a => {
                     const matchedPatient = patients.find(p =>

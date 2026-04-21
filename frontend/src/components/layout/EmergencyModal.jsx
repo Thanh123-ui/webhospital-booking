@@ -11,18 +11,10 @@ const EmergencyModal = ({ onClose }) => {
     e.preventDefault();
     setLoading(true);
     try {
-      // Gửi yêu cầu cấp cứu về Backend dưới dạng 1 Appointment trạng thái EMERGENCY
-      await api.createAppointment({
-         ...formData,
-         date: new Date().toISOString().split('T')[0],
-         time: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
-         status: 'EMERGENCY',
-         doctorId: 1, // Mặc định chuyển về khoa trực (Khoa Tim/Cấp cứu 1)
-         code: `SOS-${Math.floor(1000 + Math.random() * 9000)}`
-      });
+      await api.createEmergencyRequest(formData);
       setStep(2);
     } catch (err) {
-      alert("Lỗi khi phát tín hiệu cấp cứu. Vui lòng gọi 115 ngay!");
+      alert(err.response?.data?.message || "Lỗi khi phát tín hiệu cấp cứu. Vui lòng gọi 115 ngay!");
     } finally {
       setLoading(false);
     }

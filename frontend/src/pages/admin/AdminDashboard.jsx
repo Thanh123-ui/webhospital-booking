@@ -12,7 +12,7 @@ import { getStatusBadge, getRoleConfig } from '../../utils/helpers';
 
 // ─── Permission Matrix ────────────────────────────────────────────────────────
 // ADMIN        : Full access
-// BOD          : Full access — chỉ KHÔNG được phân quyền user
+// BOD          : Giám sát toàn viện + nhân sự vận hành, không làm thay luồng khám
 // DOCTOR       : Appointments + patients of own dept + exam
 // NURSE        : Appointments + patients của khoa mình — no medical records
 // RECEPTIONIST : Appointments only (view/confirm/arrived)
@@ -23,10 +23,10 @@ const PERMS = {
   canViewStaff:     (r) => ['ADMIN','BOD'].includes(r),
   canAddStaff:      (r) => ['ADMIN'].includes(r),
   canChangeRole:    (r) => r === 'ADMIN',           // BOD KHÔNG được phân quyền
-  canToggleActive:  (r) => r === 'ADMIN',
+  canToggleActive:  (r) => ['ADMIN', 'BOD'].includes(r),
   canViewLogs:      (r) => ['ADMIN'].includes(r),
   canExam:          (r) => r === 'DOCTOR',
-  canUpdateStatus:  (r) => ['ADMIN','BOD','DOCTOR','NURSE','RECEPTIONIST'].includes(r),
+  canUpdateStatus:  (r) => ['ADMIN','DOCTOR','NURSE','RECEPTIONIST'].includes(r),
   canTransferEmergency: (r, deptId, departments) => {
     if (!deptId || !departments) return false;
     const dept = departments.find(d => d.id === deptId);
@@ -51,6 +51,7 @@ const AdminDashboard = () => {
   const [activeTab, setActiveTab] = useState('list');
 
   const [appointments, setAppointments] = useState([]);
+  const [emergencyRequests, setEmergencyRequests] = useState([]);
   const [patients, setPatients] = useState([]);
   const [staffList, setStaffList] = useState([]);
   const [logsList, setLogsList] = useState([]);
@@ -119,21 +120,53 @@ const AdminDashboard = () => {
   };
 
   const fetchAppointments = () => api.getAllAppointments(currentStaffUser.role, currentStaffUser.deptId).then(res => setAppointments(res.data)).catch(console.error);
+  const fetchEmergencyRequests = () => api.getEmergencyRequests().then(res => setEmergencyRequests(res.data)).catch(console.error);
   const fetchPatients    = () => api.getAllPatients(currentStaffUser.role, currentStaffUser.deptId).then(res => setPatients(res.data)).catch(console.error);
-  const fetchStaff       = () => api.getAllStaff(role === 'BOD' ? 'BOD' : undefined).then(res => setStaffList(res.data)).catch(console.error);
+  const fetchStaff       = () => api.getAllStaff().then(res => setStaffList(res.data)).catch(console.error);
   const fetchLogs        = () => api.getSystemLogs().then(res => setLogsList(res.data)).catch(console.error);
 
+  const currentDept = departments.find(d => d.id === currentStaffUser?.deptId);
+  const isEmergencyDept = currentDept?.isEmergency;
+  const canAccessEmergencyAlerts = role === 'RECEPTIONIST' || (['DOCTOR', 'NURSE'].includes(role) && isEmergencyDept);
+  const openEmergencyRequests = emergencyRequests.filter((request) => ['PENDING', 'IN_PROGRESS'].includes(request.status));
+
   useEffect(() => {
-    if (!currentStaffUser) return;
+    if (!currentStaffUser) {
+      setEmergencyRequests([]);
+      return;
+    }
+
+    socket.auth = { token: localStorage.getItem('staffAccessToken') || '' };
     socket.connect();
+
+    return () => {
+      socket.disconnect();
+    };
+  }, [currentStaffUser?.id]);
+
+  useEffect(() => {
+    if (!currentStaffUser) {
+      setEmergencyRequests([]);
+      return;
+    }
+
     fetchAppointments();
     api.getDepartments().then(res => setDepartments(res.data)).catch(console.error);
     if (PERMS.canViewPatients(role)) fetchPatients();
     if (PERMS.canViewStaff(role)) fetchStaff();
     if (PERMS.canViewLogs(role)) fetchLogs();
+    if (canAccessEmergencyAlerts) fetchEmergencyRequests();
+    else setEmergencyRequests([]);
+  }, [currentStaffUser?.id, role, canAccessEmergencyAlerts]);
+
+  useEffect(() => {
+    if (!currentStaffUser) return;
 
     const refreshAppointmentsAndPatients = () => {
       fetchAppointments();
+      if (canAccessEmergencyAlerts) {
+        fetchEmergencyRequests();
+      }
       if (PERMS.canViewPatients(role)) fetchPatients();
     };
 
@@ -148,16 +181,30 @@ const AdminDashboard = () => {
       showToast(`🚨 Chuyển khoa cấp cứu: ${transfer.patientName} → ${transfer.toDeptName}`, 'emergency');
       refreshAppointmentsAndPatients();
     };
+    const handleEmergencyRequest = (request) => {
+      if (!canAccessEmergencyAlerts) return;
+      showToast(`🚨 Yêu cầu cấp cứu mới: ${request.requesterName} — ${request.phone}`, 'emergency');
+      fetchEmergencyRequests();
+    };
+    const handleEmergencyRequestUpdate = () => {
+      if (!canAccessEmergencyAlerts) return;
+      fetchEmergencyRequests();
+    };
+
     socket.on('new_appointment', handleNewAppt);
     socket.on('update_appointment', handleAppointmentUpdate);
     socket.on('emergency_transfer', handleEmergencyTransfer);
+    socket.on('new_emergency_request', handleEmergencyRequest);
+    socket.on('update_emergency_request', handleEmergencyRequestUpdate);
+
     return () => {
       socket.off('new_appointment', handleNewAppt);
       socket.off('update_appointment', handleAppointmentUpdate);
       socket.off('emergency_transfer', handleEmergencyTransfer);
-      socket.disconnect();
+      socket.off('new_emergency_request', handleEmergencyRequest);
+      socket.off('update_emergency_request', handleEmergencyRequestUpdate);
     };
-  }, [currentStaffUser, role]);
+  }, [currentStaffUser?.id, role, canAccessEmergencyAlerts]);
 
   const handleUpdateStatus = async (id, status) => {
     try {
@@ -172,6 +219,36 @@ const AdminDashboard = () => {
       await api.cancelAppointment(id, { role, reason: 'Hủy bởi nhân viên bệnh viện' }, 'staff');
       fetchAppointments();
     } catch { alert('Lỗi khi hủy lịch!'); }
+  };
+
+  const handleMarkNoShow = async (id) => {
+    if (!window.confirm('Đánh dấu lịch hẹn này là vắng mặt?')) return;
+    try {
+      await api.markAppointmentNoShow(id, { reason: 'Bệnh nhân không đến theo giờ hẹn' });
+      fetchAppointments();
+      showToast('✅ Đã đánh dấu bệnh nhân vắng mặt.');
+    } catch (err) {
+      alert(err.response?.data?.message || 'Lỗi khi đánh dấu vắng mặt!');
+    }
+  };
+
+  const handleEmergencyRequestStatus = async (id, status) => {
+    if (!canAccessEmergencyAlerts) {
+      alert('Bạn không có quyền xử lý yêu cầu cấp cứu.');
+      return;
+    }
+    try {
+      await api.updateEmergencyRequestStatus(id, status);
+      fetchEmergencyRequests();
+      showToast(
+        status === 'RESOLVED'
+          ? '✅ Đã hoàn tất yêu cầu cấp cứu.'
+          : '🚨 Đã tiếp nhận yêu cầu cấp cứu.',
+        'emergency'
+      );
+    } catch (err) {
+      alert(err.response?.data?.message || 'Lỗi khi cập nhật yêu cầu cấp cứu!');
+    }
   };
 
   const handleAddStaff = async (e) => {
@@ -262,8 +339,33 @@ const AdminDashboard = () => {
   };
 
   const roleConfig = getRoleConfig(role);
-  const currentDept = departments.find(d => d.id === currentStaffUser?.deptId);
-  const isEmergencyDept = currentDept?.isEmergency;
+
+  const canMarkNoShow = (appt) => {
+    if (!appt?.date || !appt?.time) return false;
+    if (['COMPLETED', 'CANCELED', 'NO_SHOW'].includes(appt.status)) return false;
+    const appointmentTime = new Date(`${normalizeDateValue(appt.date)}T${appt.time}:00`);
+    return Date.now() >= appointmentTime.getTime() + 30 * 60 * 1000;
+  };
+
+  const getEmergencyRequestBadge = (status) => {
+    const map = {
+      PENDING: 'bg-red-100 text-red-700 border-red-200',
+      IN_PROGRESS: 'bg-amber-100 text-amber-700 border-amber-200',
+      RESOLVED: 'bg-green-100 text-green-700 border-green-200',
+      CANCELED: 'bg-slate-100 text-slate-600 border-slate-200',
+    };
+    const text = {
+      PENDING: 'Chờ tiếp nhận',
+      IN_PROGRESS: 'Đang xử lý',
+      RESOLVED: 'Đã hoàn tất',
+      CANCELED: 'Đã hủy',
+    };
+    return (
+      <span className={`rounded-full border px-3 py-1 text-xs font-bold ${map[status] || map.PENDING}`}>
+        {text[status] || status}
+      </span>
+    );
+  };
 
   let visibleAppointments = appointments;
 
@@ -278,7 +380,7 @@ const AdminDashboard = () => {
     total: visibleAppointments.length,
     waiting: visibleAppointments.filter(a => ['READY', 'ARRIVED', 'TRANSFER_PENDING'].includes(a.status)).length,
     done: visibleAppointments.filter(a => a.status === 'COMPLETED').length,
-    emergency: visibleAppointments.filter(a => a.is_emergency).length
+    emergency: canAccessEmergencyAlerts ? openEmergencyRequests.length : 0
   };
 
   const visibleStaff = staffList.filter(s => 
@@ -450,17 +552,68 @@ const AdminDashboard = () => {
                   { label: 'Đang chờ khám', value: stats.waiting,   color: 'from-orange-500 to-amber-500', icon: <Activity size={22} className="text-white/80"/> },
                   { label: 'Đã hoàn tất',    value: stats.done,     color: 'from-green-600 to-teal-500',  icon: <Check size={22} className="text-white/80"/> },
                   { label: 'Cấp cứu',        value: stats.emergency, color: 'from-red-600 to-rose-500',    icon: <AlertTriangle size={22} className="text-white/80"/> },
-                ].map((s, i) => (
+                ].filter((s) => canAccessEmergencyAlerts || s.label !== 'Cấp cứu').map((s, i) => (
                   <div key={i} className={`rounded-[1.75rem] bg-gradient-to-br ${s.color} p-5 text-white shadow-[0_18px_36px_rgba(0,0,0,0.08)]`}>
                     <div className="flex justify-between items-start mb-3">
                       <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">{s.icon}</div>
-                      {s.value > 0 && i === 3 && <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full font-bold animate-pulse">🚨 Hoạt động</span>}
+                      {s.label === 'Cấp cứu' && s.value > 0 && <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full font-bold animate-pulse">🚨 Hoạt động</span>}
                     </div>
                     <div className="text-3xl font-black">{s.value}</div>
                     <div className="text-white/70 text-xs font-semibold mt-1 uppercase tracking-wider">{s.label}</div>
                   </div>
                 ))}
               </div>
+
+              {canAccessEmergencyAlerts && openEmergencyRequests.length > 0 && (
+                <div className="mb-6 overflow-hidden rounded-[2rem] border border-red-100 bg-white shadow-[0_12px_32px_rgba(0,0,0,0.05)]">
+                  <div className="flex items-center justify-between border-b border-red-100 bg-red-50 px-6 py-4">
+                    <div className="flex items-center gap-2 text-sm font-bold text-red-700">
+                      <Bell size={16} />
+                      Yêu cầu hỗ trợ cấp cứu đang chờ xử lý
+                    </div>
+                    <span className="rounded-full bg-red-600 px-3 py-1 text-xs font-bold text-white">
+                      {openEmergencyRequests.length} yêu cầu
+                    </span>
+                  </div>
+                  <div className="divide-y divide-red-50">
+                    {openEmergencyRequests.map((request) => (
+                      <div key={request.id} className="flex flex-col gap-4 px-6 py-5 md:flex-row md:items-center md:justify-between">
+                        <div>
+                          <div className="flex flex-wrap items-center gap-3">
+                            <span className="font-mono text-xs font-bold text-red-600">{request.code}</span>
+                            {getEmergencyRequestBadge(request.status)}
+                          </div>
+                          <div className="mt-2 font-bold text-slate-800">{request.requesterName} • {request.phone}</div>
+                          <div className="mt-1 text-sm text-slate-600">{request.symptoms}</div>
+                          {request.location ? (
+                            <div className="mt-1 text-xs text-slate-400">Vị trí: {request.location}</div>
+                          ) : null}
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2 md:justify-end">
+                          {request.status === 'PENDING' && (
+                            <button
+                              type="button"
+                              onClick={() => handleEmergencyRequestStatus(request.id, 'IN_PROGRESS')}
+                              className="rounded-xl bg-red-600 px-3 py-2 text-xs font-bold text-white transition hover:bg-red-700"
+                            >
+                              Tiếp nhận
+                            </button>
+                          )}
+                          {request.status !== 'RESOLVED' && (
+                            <button
+                              type="button"
+                              onClick={() => handleEmergencyRequestStatus(request.id, 'RESOLVED')}
+                              className="rounded-xl bg-emerald-600 px-3 py-2 text-xs font-bold text-white transition hover:bg-emerald-700"
+                            >
+                              Hoàn tất
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div className="overflow-hidden rounded-[2rem] border border-white/80 bg-surface-container-lowest shadow-[0_12px_32px_rgba(0,0,0,0.05)]">
                 {/* Filter bar */}
@@ -535,11 +688,11 @@ const AdminDashboard = () => {
                               <div className="flex items-center justify-end gap-2 flex-wrap">
                                 {PERMS.canUpdateStatus(role) && (
                                   <>
-                                    {appt.status === 'PENDING' && (
-                                      <button onClick={() => handleUpdateStatus(appt.id, 'CONFIRMED')} className="text-xs bg-blue-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-blue-700 transition">Xác nhận</button>
+                                    {appt.status === 'PENDING' && ['ADMIN', 'RECEPTIONIST'].includes(role) && (
+                                      <button onClick={() => handleUpdateStatus(appt.id, 'ARRIVED')} className="text-xs bg-blue-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-blue-700 transition">Tiếp nhận</button>
                                     )}
-                                    {appt.status === 'CONFIRMED' && (
-                                      <button onClick={() => handleUpdateStatus(appt.id, 'ARRIVED')} className="text-xs bg-indigo-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-indigo-700 transition">Đã đến viện</button>
+                                    {appt.status === 'CONFIRMED' && ['ADMIN', 'RECEPTIONIST'].includes(role) && (
+                                      <button onClick={() => handleUpdateStatus(appt.id, 'ARRIVED')} className="text-xs bg-indigo-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-indigo-700 transition">Chuyển vào khoa</button>
                                     )}
                                     {appt.status === 'ARRIVED' && role === 'NURSE' && (
                                       <button onClick={() => { setVitalsModal(appt); setVitalsData({ bloodPressure: '', heartRate: '', temperature: '', weight: '', height: '', spO2: '', notes: '' }); }} className="text-xs bg-teal-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-teal-700 transition">Đo Sinh Hiệu</button>
@@ -550,10 +703,10 @@ const AdminDashboard = () => {
                                     {(appt.is_emergency || appt.status === 'EMERGENCY') && role !== 'RECEPTIONIST' && appt.status !== 'TRANSFER_PENDING' && (
                                       <button onClick={() => handleUpdateStatus(appt.id, 'ARRIVED')} className="text-xs bg-red-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-red-700 transition">Tiếp nhận CC</button>
                                     )}
-                                    {appt.status === 'TRANSFER_PENDING' && role !== 'RECEPTIONIST' && (
+                                    {appt.status === 'TRANSFER_PENDING' && ['ADMIN', 'DOCTOR', 'NURSE'].includes(role) && (
                                       <button onClick={() => handleUpdateStatus(appt.id, 'READY')} className="text-xs bg-orange-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-orange-700 transition animate-pulse">Tiếp nhận ca chuyển</button>
                                     )}
-                                    {role === 'DOCTOR' && appt.status !== 'CANCELED' && appt.status !== 'COMPLETED' && appt.status !== 'TRANSFER_PENDING' && (
+                                    {role === 'DOCTOR' && appt.status !== 'CANCELED' && appt.status !== 'COMPLETED' && appt.status !== 'TRANSFER_PENDING' && appt.status !== 'NO_SHOW' && (
                                       <button
                                         onClick={() => { setTransferModal(appt); setTransferTargetDept(''); setTransferReason(''); }}
                                         className="text-xs bg-orange-500 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-orange-600 transition flex items-center gap-1"
@@ -563,6 +716,9 @@ const AdminDashboard = () => {
                                     )}
                                     {appt.status === 'PENDING' && (
                                       <button onClick={() => handleCancelAppointment(appt.id)} className="text-xs text-red-600 border border-red-200 px-3 py-1.5 rounded-lg font-bold hover:bg-red-50 transition">Hủy</button>
+                                    )}
+                                    {canMarkNoShow(appt) && (
+                                      <button onClick={() => handleMarkNoShow(appt.id)} className="text-xs border border-rose-200 bg-rose-50 px-3 py-1.5 rounded-lg font-bold text-rose-700 hover:bg-rose-100 transition">No-show</button>
                                     )}
                                   </>
                                 )}
@@ -738,7 +894,7 @@ const AdminDashboard = () => {
                   <div className="flex items-center justify-between mb-4">
                     {role === 'BOD' ? (
                       <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-xl px-5 py-3 text-sm font-semibold mb-4 flex items-center gap-2 w-full">
-                        <Shield size={15}/> Bạn đang xem danh sách toàn bộ bác sĩ — Phân quyền tài khoản do Admin IT quản lý
+                        <Shield size={15}/> Ban Giám Đốc xem danh sách nhân sự vận hành trong bệnh viện và có thể vô hiệu hóa tài khoản khi cần.
                       </div>
                     ) : (
                       <div className="w-full relative">
@@ -752,30 +908,32 @@ const AdminDashboard = () => {
                       <table className="w-full text-left text-sm">
                         <thead className="bg-surface-container-low text-xs uppercase tracking-wider text-on-surface-variant">
                           <tr>
-                            <th className="px-6 py-4 font-bold">Tài khoản</th>
+                            {role !== 'BOD' && <th className="px-6 py-4 font-bold">Tài khoản</th>}
                             <th className="px-6 py-4 font-bold">Họ và Tên</th>
-                            <th className="px-6 py-4 font-bold">Vai trò / Khoa</th>
+                            <th className="px-6 py-4 font-bold">{role === 'BOD' ? 'Vai trò' : 'Vai trò / Khoa'}</th>
                             <th className="px-6 py-4 font-bold">Trạng thái</th>
                             <th className="px-6 py-4 font-bold text-right">Thao tác</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-50">
                           {visibleStaff.length === 0 ? (
-                            <tr><td colSpan="5" className="text-center py-6 text-slate-400 font-semibold">Không tìm thấy tài khoản nhân sự.</td></tr>
+                            <tr><td colSpan={role === 'BOD' ? '4' : '5'} className="text-center py-6 text-slate-400 font-semibold">Không tìm thấy tài khoản nhân sự.</td></tr>
                           ) : visibleStaff.map(staff => {
                             const rc = getRoleConfig(staff.role);
                             return (
                               <tr key={staff.id} className={`transition hover:bg-slate-50 ${!staff.isActive ? 'opacity-50' : ''}`}>
-                                <td className="px-6 py-4">
-                                  <div className="font-mono font-bold text-blue-700 text-sm">{staff.username}</div>
-                                </td>
+                                {role !== 'BOD' && (
+                                  <td className="px-6 py-4">
+                                    <div className="font-mono font-bold text-blue-700 text-sm">{staff.username}</div>
+                                  </td>
+                                )}
                                 <td className="px-6 py-4">
                                   <div className="font-bold text-slate-800">{staff.name}</div>
-                                  <div className="text-xs text-slate-400 mt-0.5">{staff.title}</div>
+                                  {role !== 'BOD' && <div className="text-xs text-slate-400 mt-0.5">{staff.title}</div>}
                                 </td>
                                 <td className="px-6 py-4">
                                   <span className={`text-xs font-bold px-2.5 py-1 rounded-lg ${rc.bg} ${rc.text}`}>{rc.label}</span>
-                                  {staff.deptId && (
+                                  {role !== 'BOD' && staff.deptId && (
                                     <div className="text-xs text-slate-400 mt-1">{departments.find(d => d.id === staff.deptId)?.name}</div>
                                   )}
                                 </td>

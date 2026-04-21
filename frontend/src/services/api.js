@@ -52,16 +52,21 @@ export const api = {
   saveVitals: (id, vitalsData) => apiClient.put(`/appointments/${id}/vitals`, vitalsData, { headers: getAuthHeader('staff') }),
   completeMedicalRecord: (id, recordData) => apiClient.put(`/appointments/${id}/complete`, recordData, { headers: getAuthHeader('staff') }),
   rescheduleAppointment: (id, data) => apiClient.put(`/appointments/${id}/reschedule`, data, { headers: getAuthHeader('staff') }),
+  markAppointmentNoShow: (id, data) => apiClient.put(`/appointments/${id}/no-show`, data, { headers: getAuthHeader('staff') }),
   cancelAppointment: (id, data, authType = 'either') => apiClient.put(`/appointments/${id}/cancel`, data, { headers: getAuthHeader(authType) }),
   transferPatient: (id, data) => apiClient.put(`/appointments/${id}/transfer`, data, { headers: getAuthHeader('staff') }),
   getEmergencyTransfers: () => apiClient.get('/appointments/emergency-transfers', { headers: getAuthHeader('staff') }),
+
+  createEmergencyRequest: (data) => apiClient.post('/emergency-requests', data),
+  getEmergencyRequests: () => apiClient.get('/emergency-requests', { headers: getAuthHeader('staff') }),
+  updateEmergencyRequestStatus: (id, status) => apiClient.put(`/emergency-requests/${id}/status`, { status }, { headers: getAuthHeader('staff') }),
 
   getAllPatients: (role, deptId) => apiClient.get('/patients', { params: { role, deptId }, headers: getAuthHeader('staff') }),
   getPatientById: (id, authType = 'patient') => apiClient.get(`/patients/${id}`, { headers: getAuthHeader(authType) }),
   registerPatient: (data) => apiClient.post('/patients/register', data),
   updatePatientProfile: (id, data, authType = 'patient') => apiClient.put(`/patients/${id}`, data, { headers: getAuthHeader(authType) }),
 
-  getAllStaff: (role) => apiClient.get('/staff', { params: role ? { role } : {}, headers: getAuthHeader('staff') }),
+  getAllStaff: () => apiClient.get('/staff', { headers: getAuthHeader('staff') }),
   addStaff: (data) => apiClient.post('/staff', data, { headers: getAuthHeader('staff') }),
   updateStaffRole: (id, role) => apiClient.put(`/staff/${id}/role`, { role }, { headers: getAuthHeader('staff') }),
   toggleStaffActive: (id) => apiClient.put(`/staff/${id}/toggle-active`, {}, { headers: getAuthHeader('staff') }),

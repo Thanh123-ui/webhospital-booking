@@ -34,6 +34,7 @@ if (DB_MODE === 'mock') {
     staffList: [...initialStaff],
     patientsList: [...initialPatients],
     appointmentsList: [...initialAppointments],
+    emergencyRequests: [],
     logsList: [],
     ratingsList: [],
     emergencyTransfers: [],
@@ -49,6 +50,7 @@ if (DB_MODE === 'mock') {
   async function getStaff() { return state.staffList; }
   async function getRatings() { return state.ratingsList; }
   async function getEmergencyTransfers() { return state.emergencyTransfers; }
+  async function getEmergencyRequests() { return state.emergencyRequests; }
 
   // ── CRUD async functions (mock mode) ────────────────────────────────────
 
@@ -135,16 +137,93 @@ if (DB_MODE === 'mock') {
     return record;
   }
 
+  async function saveEmergencyRequest(request) {
+    state.emergencyRequests.unshift(request);
+    return request;
+  }
+
+  async function findEmergencyRequestById(id) {
+    return state.emergencyRequests.find((request) => request.id === id) || null;
+  }
+
+  async function updateEmergencyRequest(id, fields) {
+    const idx = state.emergencyRequests.findIndex((request) => request.id === id);
+    if (idx === -1) return null;
+    Object.assign(state.emergencyRequests[idx], fields);
+    return state.emergencyRequests[idx];
+  }
+
   async function updateScheduleBooked(doctorId, date, time, delta) {
     const idx = state.schedules.findIndex(
       s => s.doctorId === doctorId && s.date === date && s.time === time
     );
-    if (idx !== -1) state.schedules[idx].booked += delta;
+    if (idx !== -1) {
+      state.schedules[idx].booked = Math.max(0, state.schedules[idx].booked + delta);
+    }
+  }
+
+  async function reassignAppointmentSlot(id, fields) {
+    const appointment = await findAppointmentById(id);
+    if (!appointment) return null;
+
+    const nextDoctorId = parseInt(fields.doctorId, 10);
+    const nextDate = fields.date;
+    const nextTime = fields.time;
+
+    const sameSlot = parseInt(appointment.doctorId, 10) === nextDoctorId
+      && appointment.date === nextDate
+      && appointment.time === nextTime;
+
+    let oldSlotIdx = -1;
+    let newSlotIdx = -1;
+
+    if (!sameSlot) {
+      oldSlotIdx = state.schedules.findIndex(
+        (slot) => slot.doctorId === parseInt(appointment.doctorId, 10)
+          && slot.date === appointment.date
+          && slot.time === appointment.time
+      );
+
+      newSlotIdx = state.schedules.findIndex(
+        (slot) => slot.doctorId === nextDoctorId
+          && slot.date === nextDate
+          && slot.time === nextTime
+      );
+
+      if (newSlotIdx === -1) {
+        throw new Error('Không tìm thấy lịch trống cho khung giờ mới.');
+      }
+
+      const nextSlot = state.schedules[newSlotIdx];
+      if (nextSlot.booked >= nextSlot.maxPatients) {
+        throw new Error('Khung giờ mới của khoa đã đạt giới hạn tiếp nhận.');
+      }
+
+      state.schedules[newSlotIdx].booked += 1;
+      if (oldSlotIdx !== -1) {
+        state.schedules[oldSlotIdx].booked = Math.max(0, state.schedules[oldSlotIdx].booked - 1);
+      }
+    }
+
+    try {
+      return await updateAppointment(id, fields);
+    } catch (err) {
+      if (!sameSlot) {
+        if (newSlotIdx !== -1) {
+          state.schedules[newSlotIdx].booked = Math.max(0, state.schedules[newSlotIdx].booked - 1);
+        }
+        if (oldSlotIdx !== -1) {
+          state.schedules[oldSlotIdx].booked += 1;
+        }
+      }
+      throw err;
+    }
   }
 
   async function nextAppointmentId() { return state.appointmentsList.length + 1; }
   async function nextPatientId() { return state.patientsList.length + 1; }
   async function nextStaffId() { return state.staffList.length + 1; }
+  async function nextEmergencyRequestId() { return state.emergencyRequests.length + 1; }
 
   // Vitals — lưu sinh hiệu (mock mode dùng Map trong bộ nhớ)
   const vitalsStore = new Map();
@@ -163,11 +242,13 @@ if (DB_MODE === 'mock') {
     // ── Async query / CRUD functions ────────────────────────────────────────
     getDepartments, getDoctors, getAppointments, getPatients,
     getSchedules, getStaff, getRatings, getEmergencyTransfers,
+    getEmergencyRequests,
     saveAppointment, updateAppointment, findAppointmentById, findAppointmentByCode,
     findPatientByPhone, findPatientById, addPatient, updatePatient, appendMedicalHistory,
     findStaffByUsername, addStaff, updateStaffField,
-    addRating, addLog, addEmergencyTransfer, updateScheduleBooked,
-    nextAppointmentId, nextPatientId, nextStaffId,
+    addRating, addLog, addEmergencyTransfer, saveEmergencyRequest,
+    findEmergencyRequestById, updateEmergencyRequest, updateScheduleBooked, reassignAppointmentSlot,
+    nextAppointmentId, nextPatientId, nextStaffId, nextEmergencyRequestId,
     saveVitals, getVitalsByAppointmentId,
 
     DB_MODE: 'mock',
@@ -216,9 +297,29 @@ else if (DB_MODE === 'mysql') {
       const schemaPath = path.join(__dirname, '..', '..', 'schema.sql');
       const sql = fs.readFileSync(schemaPath, 'utf8');
       await pool.query(sql);
+      await ensureAppointmentColumns();
       console.log('✅  [DB] Đồng bộ schema và seed data thành công!');
     } catch (err) {
       console.error('❌  [DB] Lỗi khi tạo schema:', err.message);
+    }
+  }
+
+  async function ensureAppointmentColumns() {
+    const requiredColumns = [
+      ['rescheduledAt', 'ALTER TABLE appointments ADD COLUMN rescheduledAt TIMESTAMP NULL'],
+      ['rescheduledBy', 'ALTER TABLE appointments ADD COLUMN rescheduledBy INT NULL'],
+      ['rescheduledByName', 'ALTER TABLE appointments ADD COLUMN rescheduledByName VARCHAR(150) NULL'],
+      ['noShowAt', 'ALTER TABLE appointments ADD COLUMN noShowAt TIMESTAMP NULL'],
+      ['noShowBy', 'ALTER TABLE appointments ADD COLUMN noShowBy INT NULL'],
+      ['noShowByName', 'ALTER TABLE appointments ADD COLUMN noShowByName VARCHAR(150) NULL'],
+      ['noShowReason', 'ALTER TABLE appointments ADD COLUMN noShowReason TEXT NULL'],
+    ];
+
+    for (const [columnName, alterSql] of requiredColumns) {
+      const rows = await query('SHOW COLUMNS FROM appointments LIKE ?', [columnName]);
+      if (!rows.length) {
+        await pool.execute(alterSql);
+      }
     }
   }
 
@@ -271,6 +372,7 @@ else if (DB_MODE === 'mysql') {
     `);
     return rows.map(a => ({
       ...a,
+      history: typeof a.history === 'string' ? (() => { try { return JSON.parse(a.history); } catch { return []; } })() : (a.history || []),
       vitals: a.recordedAt ? {
         bloodPressure: a.bloodPressure,
         heartRate: a.heartRate,
@@ -297,6 +399,15 @@ else if (DB_MODE === 'mysql') {
   }
   async function getRatings() { return query('SELECT * FROM ratings ORDER BY id DESC'); }
   async function getEmergencyTransfers() { return query('SELECT * FROM emergency_transfers ORDER BY id DESC'); }
+  async function getEmergencyRequests() {
+    const rows = await query('SELECT * FROM emergency_requests ORDER BY id DESC');
+    return rows.map((request) => ({
+      ...request,
+      history: typeof request.history === 'string'
+        ? (() => { try { return JSON.parse(request.history); } catch { return []; } })()
+        : (request.history || []),
+    }));
+  }
 
   // ── CRUD functions (MySQL mode) ──────────────────────────────────────────
 
@@ -316,7 +427,11 @@ else if (DB_MODE === 'mysql') {
   }
 
   async function updateAppointment(id, fields) {
-    const allowed = ['status', 'doctorId', 'deptId', 'date', 'time', 'history', 'current_department'];
+    const allowed = [
+      'status', 'doctorId', 'deptId', 'date', 'time', 'history', 'current_department',
+      'rescheduledAt', 'rescheduledBy', 'rescheduledByName',
+      'noShowAt', 'noShowBy', 'noShowByName', 'noShowReason',
+    ];
     const sets = [];
     const vals = [];
     for (const [k, v] of Object.entries(fields)) {
@@ -498,9 +613,135 @@ else if (DB_MODE === 'mysql') {
 
   async function updateScheduleBooked(doctorId, date, time, delta) {
     await pool.execute(
-      'UPDATE schedules SET booked = booked + ? WHERE doctorId = ? AND `date` = ? AND `time` = ?',
+      'UPDATE schedules SET booked = GREATEST(booked + ?, 0) WHERE doctorId = ? AND `date` = ? AND `time` = ?',
       [delta, doctorId, date, time]
     );
+  }
+
+  async function saveEmergencyRequest(request) {
+    const sql = `INSERT INTO emergency_requests
+      (code, requesterName, phone, symptoms, location, status, history, createdAt, handledAt, handledBy, handledByName)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?)`;
+    const [result] = await pool.execute(sql, [
+      request.code,
+      request.requesterName,
+      request.phone,
+      request.symptoms || '',
+      request.location || '',
+      request.status,
+      JSON.stringify(request.history || []),
+      request.createdAt,
+      request.handledAt || null,
+      request.handledBy || null,
+      request.handledByName || null,
+    ]);
+    request.id = result.insertId;
+    return request;
+  }
+
+  async function findEmergencyRequestById(id) {
+    const rows = await query('SELECT * FROM emergency_requests WHERE id = ?', [id]);
+    if (!rows[0]) return null;
+    const request = rows[0];
+    if (typeof request.history === 'string') {
+      try { request.history = JSON.parse(request.history); } catch { request.history = []; }
+    }
+    return request;
+  }
+
+  async function updateEmergencyRequest(id, fields) {
+    const allowed = ['status', 'history', 'handledAt', 'handledBy', 'handledByName'];
+    const sets = [];
+    const vals = [];
+
+    for (const [key, value] of Object.entries(fields)) {
+      if (!allowed.includes(key)) continue;
+      sets.push(`\`${key}\` = ?`);
+      vals.push(key === 'history' ? JSON.stringify(value) : value);
+    }
+
+    if (!sets.length) return findEmergencyRequestById(id);
+
+    await pool.execute(`UPDATE emergency_requests SET ${sets.join(', ')} WHERE id = ?`, [...vals, id]);
+    return findEmergencyRequestById(id);
+  }
+
+  async function reassignAppointmentSlot(id, fields) {
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+
+      const [appointmentRows] = await connection.execute(
+        'SELECT * FROM appointments WHERE id = ? FOR UPDATE',
+        [id]
+      );
+      if (!appointmentRows[0]) {
+        throw new Error('Not found');
+      }
+
+      const appointment = appointmentRows[0];
+      const nextDoctorId = parseInt(fields.doctorId, 10);
+      const nextDate = fields.date;
+      const nextTime = fields.time;
+      const sameSlot = parseInt(appointment.doctorId, 10) === nextDoctorId
+        && String(appointment.date).slice(0, 10) === nextDate
+        && appointment.time === nextTime;
+
+      if (!sameSlot) {
+        const [nextSlotRows] = await connection.execute(
+          'SELECT * FROM schedules WHERE doctorId = ? AND `date` = ? AND `time` = ? FOR UPDATE',
+          [nextDoctorId, nextDate, nextTime]
+        );
+
+        if (!nextSlotRows[0]) {
+          throw new Error('Không tìm thấy lịch trống cho khung giờ mới.');
+        }
+
+        if (nextSlotRows[0].booked >= nextSlotRows[0].maxPatients) {
+          throw new Error('Khung giờ mới của khoa đã đạt giới hạn tiếp nhận.');
+        }
+
+        await connection.execute(
+          'UPDATE schedules SET booked = booked + 1 WHERE id = ?',
+          [nextSlotRows[0].id]
+        );
+
+        if (appointment.doctorId && appointment.date && appointment.time) {
+          const [oldSlotRows] = await connection.execute(
+            'SELECT * FROM schedules WHERE doctorId = ? AND `date` = ? AND `time` = ? FOR UPDATE',
+            [appointment.doctorId, String(appointment.date).slice(0, 10), appointment.time]
+          );
+
+          if (oldSlotRows[0]) {
+            await connection.execute(
+              'UPDATE schedules SET booked = GREATEST(booked - 1, 0) WHERE id = ?',
+              [oldSlotRows[0].id]
+            );
+          }
+        }
+      }
+
+      const allowed = [
+        'status', 'doctorId', 'deptId', 'date', 'time', 'history',
+        'rescheduledAt', 'rescheduledBy', 'rescheduledByName',
+      ];
+      const sets = [];
+      const vals = [];
+      for (const [key, value] of Object.entries(fields)) {
+        if (!allowed.includes(key)) continue;
+        sets.push(`\`${key}\` = ?`);
+        vals.push(key === 'history' ? JSON.stringify(value) : value);
+      }
+
+      await connection.execute(`UPDATE appointments SET ${sets.join(', ')} WHERE id = ?`, [...vals, id]);
+      await connection.commit();
+      return findAppointmentById(id);
+    } catch (err) {
+      await connection.rollback();
+      throw err;
+    } finally {
+      connection.release();
+    }
   }
 
   // ── VITALS (sinh hiệu — bảng riêng) ──────────────────────────────────────────
@@ -537,15 +778,20 @@ else if (DB_MODE === 'mysql') {
     const rows = await query('SELECT MAX(id) AS mx FROM staff');
     return (rows[0]?.mx || 0) + 1;
   }
+  async function nextEmergencyRequestId() {
+    const rows = await query('SELECT MAX(id) AS mx FROM emergency_requests');
+    return (rows[0]?.mx || 0) + 1;
+  }
 
   module.exports = {
     getDepartments, getDoctors, getAppointments, getPatients,
-    getSchedules, getStaff, getRatings, getEmergencyTransfers,
+    getSchedules, getStaff, getRatings, getEmergencyTransfers, getEmergencyRequests,
     saveAppointment, updateAppointment, findAppointmentById, findAppointmentByCode,
     findPatientByPhone, findPatientById, addPatient, updatePatient, appendMedicalHistory,
     findStaffByUsername, addStaff, updateStaffField,
-    addRating, addLog, addEmergencyTransfer, updateScheduleBooked,
-    nextAppointmentId, nextPatientId, nextStaffId,
+    addRating, addLog, addEmergencyTransfer, saveEmergencyRequest,
+    findEmergencyRequestById, updateEmergencyRequest, updateScheduleBooked, reassignAppointmentSlot,
+    nextAppointmentId, nextPatientId, nextStaffId, nextEmergencyRequestId,
     saveVitals, getVitalsByAppointmentId,
     initDatabase, generateSchedulesIfEmpty,
     pool, query,

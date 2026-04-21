@@ -10,6 +10,6 @@ router.use(verifyToken);
 
 router.get('/', verifyRole('ADMIN', 'BOD', 'DOCTOR', 'NURSE', 'RECEPTIONIST'), patientsController.getAllPatients);
 router.get('/:id', verifyRole('ADMIN', 'BOD', 'DOCTOR', 'NURSE', 'RECEPTIONIST', 'PATIENT'), patientsController.getPatientById);
-router.put('/:id', verifyRole('ADMIN', 'BOD', 'DOCTOR', 'NURSE', 'RECEPTIONIST', 'PATIENT'), patientsController.updatePatient);
+router.put('/:id', verifyRole('ADMIN', 'DOCTOR', 'NURSE', 'RECEPTIONIST', 'PATIENT'), patientsController.updatePatient);
 
 module.exports = router;

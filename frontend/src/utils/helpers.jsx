@@ -14,11 +14,12 @@ export const getStatusBadge = (status) => {
   const badges = {
     EMERGENCY:          { color: 'bg-red-600 text-white border-red-700 animate-pulse', text: '🚨 Cấp cứu' },
     EMERGENCY_TRANSFER: { color: 'bg-orange-500 text-white border-orange-600 animate-pulse', text: '🔄 Chuyển khoa' },
-    PENDING:            { color: 'bg-yellow-100 text-yellow-800 border-yellow-300', text: '⏳ Chờ xác nhận' },
-    CONFIRMED:          { color: 'bg-blue-100 text-blue-800 border-blue-200', text: '✅ Đã xác nhận' },
-    ARRIVED:            { color: 'bg-indigo-100 text-indigo-800 border-indigo-200', text: '🏥 Đã đến viện' },
-    READY:              { color: 'bg-teal-100 text-teal-800 border-teal-200', text: '🩺 Chờ khám bác sĩ' },
+    PENDING:            { color: 'bg-yellow-100 text-yellow-800 border-yellow-300', text: '⏳ Chờ lễ tân tiếp nhận' },
+    CONFIRMED:          { color: 'bg-blue-100 text-blue-800 border-blue-200', text: '📌 Đã xác nhận lịch' },
+    ARRIVED:            { color: 'bg-indigo-100 text-indigo-800 border-indigo-200', text: '🏥 Đã vào khoa chờ điều dưỡng' },
+    READY:              { color: 'bg-teal-100 text-teal-800 border-teal-200', text: '🩺 Sẵn sàng cho bác sĩ khám' },
     COMPLETED:          { color: 'bg-green-100 text-green-800 border-green-200', text: '✔ Hoàn thành' },
+    NO_SHOW:            { color: 'bg-rose-100 text-rose-800 border-rose-200', text: '🙍 Vắng mặt' },
     CANCELED:           { color: 'bg-gray-100 text-gray-600 border-gray-200', text: '✕ Đã hủy' },
   };
   const b = badges[status] || badges.PENDING;

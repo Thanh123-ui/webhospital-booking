@@ -1,28 +1,23 @@
 const db = require('../data/db');
 
-function isStaffActive(staff) {
-    return staff?.isActive === true || staff?.isActive === 1 || staff?.isActive === '1';
-}
-
 function sanitizeStaff(staff) {
     if (!staff) return staff;
     const { password, ...staffWithoutPassword } = staff;
     return staffWithoutPassword;
 }
 
-// GET /api/staff?role=BOD  → BOD chỉ xem danh sách bác sĩ (DOCTOR), không được phân quyền
-// GET /api/staff            → Admin/RECEPTIONIST xem toàn bộ
+// GET /api/staff → ADMIN xem toàn bộ
+// BOD chỉ xem nhân sự vận hành trong bệnh viện
 exports.getAllStaff = async (req, res) => {
     try {
         const { role } = req.user;
         const staffList = await db.getStaff();
 
-        // Ban Giám Đốc: chỉ thấy danh sách bác sĩ (DOCTOR) đang chạy, không thấy admin/system accounts
         if (role === 'BOD') {
-            const doctors = staffList
-                .filter(s => s.role === 'DOCTOR' && isStaffActive(s))
+            const operationalStaff = staffList
+                .filter((staff) => ['DOCTOR', 'NURSE', 'RECEPTIONIST'].includes(staff.role))
                 .map(sanitizeStaff);
-            return res.json(doctors);
+            return res.json(operationalStaff);
         }
 
         res.json(staffList.map(sanitizeStaff));
@@ -34,10 +29,15 @@ exports.getAllStaff = async (req, res) => {
 exports.addStaff = async (req, res) => {
     try {
         const data = req.body;
+        const requester = req.user;
         const staffList = await db.getStaff();
 
         if (staffList.find(s => s.username === data.username)) {
             return res.status(400).json({ message: 'Username đã tồn tại, vui lòng chọn tên khác!' });
+        }
+
+        if (requester.role === 'BOD' && !['DOCTOR', 'NURSE', 'RECEPTIONIST'].includes(data.role)) {
+            return res.status(403).json({ message: 'Ban Giám Đốc chỉ được tạo tài khoản vận hành: bác sĩ, điều dưỡng hoặc lễ tân.' });
         }
 
         const avatarMap = { BOD: '👔', DOCTOR: '👨‍⚕️', NURSE: '👩‍⚕️', RECEPTIONIST: '👩‍💼', ADMIN: '🧑‍💻' };
@@ -86,10 +86,19 @@ exports.updateStaffRole = async (req, res) => {
 exports.toggleStaffActive = async (req, res) => {
     try {
         const { id } = req.params;
+        const requester = req.user;
 
         const staffList = await db.getStaff();
         const staff = staffList.find(s => s.id === parseInt(id));
         if (!staff) return res.status(404).json({ message: 'Not found' });
+
+        if (requester.id === parseInt(id)) {
+            return res.status(400).json({ message: 'Không thể tự khóa hoặc tự mở khóa tài khoản của chính mình.' });
+        }
+
+        if (requester.role === 'BOD' && ['ADMIN', 'BOD'].includes(staff.role)) {
+            return res.status(403).json({ message: 'Ban Giám Đốc không được khóa/mở khóa tài khoản Admin IT hoặc Ban Giám Đốc.' });
+        }
 
         const updated = await db.updateStaffField(parseInt(id), { isActive: !staff.isActive });
         res.json(sanitizeStaff(updated));
