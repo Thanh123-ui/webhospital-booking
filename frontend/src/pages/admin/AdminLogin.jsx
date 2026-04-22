@@ -22,6 +22,7 @@ const AdminLogin = () => {
       const res = await api.loginStaff(username, password);
       if (res.data.success) {
         localStorage.setItem('staffAccessToken', res.data.accessToken);
+        localStorage.setItem('staffRefreshToken', res.data.refreshToken);
         setCurrentStaffUser(res.data.user);
         navigate('/admin/dashboard');
       }

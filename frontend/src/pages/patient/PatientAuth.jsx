@@ -25,12 +25,14 @@ const PatientAuth = () => {
       if (isLogin) {
         const res = await api.loginPatient(phone, password);
         localStorage.setItem('patientAccessToken', res.data.accessToken);
+        localStorage.setItem('patientRefreshToken', res.data.refreshToken);
         setCurrentPatient(res.data.user);
         navigate(redirectTo, { replace: true });
       } else {
         await api.registerPatient(regData);
         const loginRes = await api.loginPatient(regData.phone, regData.password);
         localStorage.setItem('patientAccessToken', loginRes.data.accessToken);
+        localStorage.setItem('patientRefreshToken', loginRes.data.refreshToken);
         setCurrentPatient(loginRes.data.user);
         navigate(redirectTo, { replace: true });
       }

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../services/AuthContext';
 import { User, Calendar, FileText, Activity, Clock, Printer, Star } from 'lucide-react';
 import { api } from '../../services/api';
-import { getStatusBadge } from '../../utils/helpers';
+import { formatDateDisplay, getStatusBadge, normalizeDateValue } from '../../utils/helpers';
 
 const PatientProfile = () => {
   const { currentPatient, setCurrentPatient } = useAuth();
@@ -127,7 +127,7 @@ const PatientProfile = () => {
                   <div key={appt.id} className="p-4 border rounded-2xl flex flex-col md:flex-row justify-between md:items-center gap-4 bg-slate-50 hover:bg-white transition hover:shadow-md hover:border-blue-200">
                      <div>
                        <div className="text-xs text-blue-600 font-bold mb-1 uppercase tracking-wider">{appt.code}</div>
-                       <div className="font-semibold text-slate-800 flex items-center gap-2"><Calendar size={16}/> {appt.date} <span className="text-slate-300">|</span> <Clock size={16}/> {appt.time}</div>
+                       <div className="font-semibold text-slate-800 flex items-center gap-2"><Calendar size={16}/> {formatDateDisplay(appt.date)} <span className="text-slate-300">|</span> <Clock size={16}/> {appt.time}</div>
                      </div>
                       <div>{getStatusBadge(appt.status)}</div>
                       {(appt.status === 'PENDING' || appt.status === 'CONFIRMED') && (
@@ -151,7 +151,7 @@ const PatientProfile = () => {
                {(currentPatient.medicalHistory || []).map((history, idx) => (
                  <div key={idx} className="border-l-4 border-blue-500 pl-6 py-2 relative">
                    <div className="absolute w-3 h-3 bg-blue-500 rounded-full -left-[8px] top-4 border-2 border-white"></div>
-                   <div className="text-sm font-semibold text-blue-600 mb-1">{history.date}</div>
+                   <div className="text-sm font-semibold text-blue-600 mb-1">{formatDateDisplay(history.date)}</div>
                    <div className="font-bold text-slate-800 text-lg mb-2">{history.diagnosis || 'Không có chẩn đoán'}</div>
                    <div className="flex items-center justify-between mb-3">
                       <div className="text-sm text-slate-600"><span className="text-slate-400">Bác sĩ khám:</span> {history.doctor || '---'}</div>
@@ -208,7 +208,7 @@ const PatientProfile = () => {
                     <div className="grid grid-cols-2 gap-4">
                        <div><b>Bệnh nhân:</b> {currentPatient.name}</div>
                        <div><b>Mã BN:</b> UID-{currentPatient.id}</div>
-                       <div><b>Năm sinh:</b> {currentPatient.dob?.split('-')[0] || '---'}</div>
+                       <div><b>Năm sinh:</b> {normalizeDateValue(currentPatient.dob)?.split('-')[0] || '---'}</div>
                        <div><b>SĐT:</b> {currentPatient.phone}</div>
                     </div>
                     <div className="mt-4 pt-2 border-t border-slate-50">
@@ -227,7 +227,7 @@ const PatientProfile = () => {
                     )}
                     <div className="flex justify-end text-center">
                        <div>
-                          <div className="text-sm mb-16">Ngày {new Date(printData.date).getDate()} tháng {new Date(printData.date).getMonth()+1} năm {new Date(printData.date).getFullYear()}<br/><b>Bác sĩ điều trị</b></div>
+                          <div className="text-sm mb-16">Ngày {new Date(normalizeDateValue(printData.date)).getDate()} tháng {new Date(normalizeDateValue(printData.date)).getMonth()+1} năm {new Date(normalizeDateValue(printData.date)).getFullYear()}<br/><b>Bác sĩ điều trị</b></div>
                           <div className="font-bold text-lg">{printData.doctor}</div>
                        </div>
                     </div>

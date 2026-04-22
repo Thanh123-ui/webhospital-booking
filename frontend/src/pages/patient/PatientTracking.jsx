@@ -15,7 +15,7 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import { api } from '../../services/api';
-import { getStatusBadge } from '../../utils/helpers';
+import { formatDateDisplay, getStatusBadge } from '../../utils/helpers';
 
 const STATUS_GUIDE = [
   { icon: <Clock size={16} />, color: 'text-yellow-700 bg-yellow-50 border-yellow-200', label: 'Chờ xác nhận', desc: 'Lịch hẹn vừa được tạo và đang chờ bệnh viện duyệt.' },
@@ -228,7 +228,7 @@ const PatientTracking = () => {
                     </div>
                     <div>
                       <div className="text-xs font-semibold uppercase tracking-[0.18em] text-on-surface-variant">Ngày khám</div>
-                      <div className="mt-1 font-bold text-on-surface">{result.date}</div>
+                      <div className="mt-1 font-bold text-on-surface">{formatDateDisplay(result.date)}</div>
                     </div>
                   </div>
                 </div>

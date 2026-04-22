@@ -10,13 +10,23 @@ const apiClient = axios.create({
   headers: { 'Content-Type': 'application/json' }
 });
 
+const ACCESS_TOKEN_KEYS = {
+  patient: 'patientAccessToken',
+  staff: 'staffAccessToken',
+};
+
+const REFRESH_TOKEN_KEYS = {
+  patient: 'patientRefreshToken',
+  staff: 'staffRefreshToken',
+};
+
 const getPatientAuthHeader = () => {
-  const token = localStorage.getItem('patientAccessToken');
+  const token = localStorage.getItem(ACCESS_TOKEN_KEYS.patient);
   return token ? { Authorization: `Bearer ${token}` } : {};
 };
 
 const getStaffAuthHeader = () => {
-  const token = localStorage.getItem('staffAccessToken');
+  const token = localStorage.getItem(ACCESS_TOKEN_KEYS.staff);
   return token ? { Authorization: `Bearer ${token}` } : {};
 };
 
@@ -29,6 +39,103 @@ const getAuthHeader = (authType = 'staff') => {
 
   return getPatientAuthHeader();
 };
+
+const refreshClient = axios.create({
+  baseURL: API_URL,
+  headers: { 'Content-Type': 'application/json' }
+});
+
+const clearAuthStorage = (authType) => {
+  if (!authType) return;
+  localStorage.removeItem(ACCESS_TOKEN_KEYS[authType]);
+  localStorage.removeItem(REFRESH_TOKEN_KEYS[authType]);
+};
+
+const resolveAuthTypeFromRequest = (config) => {
+  const authHeader = config?.headers?.Authorization || config?.headers?.authorization;
+  const bearerToken = typeof authHeader === 'string' && authHeader.startsWith('Bearer ')
+    ? authHeader.slice(7)
+    : '';
+
+  const patientToken = localStorage.getItem(ACCESS_TOKEN_KEYS.patient);
+  const staffToken = localStorage.getItem(ACCESS_TOKEN_KEYS.staff);
+
+  if (bearerToken && bearerToken === patientToken) return 'patient';
+  if (bearerToken && bearerToken === staffToken) return 'staff';
+
+  if (patientToken && !staffToken) return 'patient';
+  if (staffToken && !patientToken) return 'staff';
+
+  return null;
+};
+
+let refreshPromise = null;
+
+const refreshAccessToken = async (authType) => {
+  const refreshTokenKey = REFRESH_TOKEN_KEYS[authType];
+  const accessTokenKey = ACCESS_TOKEN_KEYS[authType];
+  const refreshToken = localStorage.getItem(refreshTokenKey);
+
+  if (!refreshToken) {
+    clearAuthStorage(authType);
+    throw new Error('Missing refresh token');
+  }
+
+  const res = await refreshClient.post('/auth/refresh', { token: refreshToken });
+  const { accessToken, refreshToken: nextRefreshToken } = res.data || {};
+
+  if (!accessToken) {
+    clearAuthStorage(authType);
+    throw new Error('Refresh response missing access token');
+  }
+
+  localStorage.setItem(accessTokenKey, accessToken);
+  if (nextRefreshToken) {
+    localStorage.setItem(refreshTokenKey, nextRefreshToken);
+  }
+
+  return accessToken;
+};
+
+apiClient.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const originalRequest = error.config;
+    const status = error?.response?.status;
+    const message = error?.response?.data?.message || '';
+
+    if (!originalRequest || originalRequest._retry || originalRequest.url === '/auth/refresh') {
+      return Promise.reject(error);
+    }
+
+    const tokenExpired = status === 401 || (status === 403 && /token/i.test(message));
+    if (!tokenExpired) {
+      return Promise.reject(error);
+    }
+
+    const authType = resolveAuthTypeFromRequest(originalRequest);
+    if (!authType) {
+      return Promise.reject(error);
+    }
+
+    try {
+      if (!refreshPromise) {
+        refreshPromise = refreshAccessToken(authType).finally(() => {
+          refreshPromise = null;
+        });
+      }
+
+      const newAccessToken = await refreshPromise;
+      originalRequest._retry = true;
+      originalRequest.headers = originalRequest.headers || {};
+      originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
+      return apiClient(originalRequest);
+    } catch (refreshError) {
+      clearAuthStorage(authType);
+      return Promise.reject(refreshError);
+    }
+  }
+);
 
 export const api = {
   getDepartments: () => apiClient.get('/data/departments'),

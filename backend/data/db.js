@@ -299,6 +299,7 @@ else if (DB_MODE === 'mysql') {
       await pool.query(sql);
       await ensureAppointmentColumns();
       await hashSeedPasswords();
+      await ensureDefaultAdminAccount();
       console.log('✅  [DB] Đồng bộ schema và seed data thành công!');
     } catch (err) {
       console.error('❌  [DB] Lỗi khi tạo schema:', err.message);
@@ -340,6 +341,28 @@ else if (DB_MODE === 'mysql') {
         console.log(`🔒 [DB] Đã hash ${rows.length} mật khẩu chưa mã hoá trong bảng ${table}.`);
       }
     }
+  }
+
+  async function ensureDefaultAdminAccount() {
+    const username = 'admin';
+    const defaultPassword = '123';
+    const hashedPassword = await bcrypt.hash(defaultPassword, saltRounds);
+    const existingAdmin = await query('SELECT id FROM staff WHERE username = ? LIMIT 1', [username]);
+
+    if (existingAdmin.length > 0) {
+      await pool.execute(
+        'UPDATE staff SET deptId = NULL, name = ?, title = ?, role = ?, isActive = 1, password = ? WHERE username = ?',
+        ['Nguyễn Văn IT', 'Quản trị hệ thống (IT)', 'ADMIN', hashedPassword, username]
+      );
+      console.log('🔐 [DB] Đã đặt lại tài khoản admin mặc định: admin / 123');
+      return;
+    }
+
+    await pool.execute(
+      'INSERT INTO staff (deptId, name, title, avatar, exp, role, isActive, username, password) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [null, 'Nguyễn Văn IT', 'Quản trị hệ thống (IT)', '🧑‍💻', null, 'ADMIN', 1, username, hashedPassword]
+    );
+    console.log('🔐 [DB] Đã tạo tài khoản admin mặc định: admin / 123');
   }
 
   // ── TỰ SINH LỊCH KHÁM 7 NGÀY nếu bảng schedules trống ─────────────────

@@ -14,3 +14,4 @@ frontend/._package.json
 ._schema.sql
 frontend/._node_modules
 backend/._node_modulesf
+backend/.npm-cache
