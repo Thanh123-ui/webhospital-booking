@@ -41,16 +41,42 @@ const BookingWizard = () => {
     return `${year}-${month}-${day}`;
   };
 
+  const normalizeDateString = (dateValue) => {
+    if (!dateValue) return '';
+    if (dateValue instanceof Date && !Number.isNaN(dateValue.getTime())) {
+      return toLocalDateInputValue(dateValue);
+    }
+
+    const raw = String(dateValue).trim();
+    if (!raw) return '';
+
+    const isoMatch = raw.match(/^(\d{4}-\d{2}-\d{2})/);
+    if (isoMatch) return isoMatch[1];
+
+    const parsed = new Date(raw);
+    if (!Number.isNaN(parsed.getTime())) {
+      return toLocalDateInputValue(parsed);
+    }
+
+    return '';
+  };
+
   const formatBookingDate = (dateStr, options = { day: '2-digit', month: '2-digit', year: 'numeric' }) => {
-    if (!dateStr) return '---';
-    const [year, month, day] = dateStr.split('-').map(Number);
+    const normalizedDate = normalizeDateString(dateStr);
+    if (!normalizedDate) return '---';
+    const [year, month, day] = normalizedDate.split('-').map(Number);
     return new Intl.DateTimeFormat('vi-VN', options).format(new Date(year, month - 1, day, 12));
   };
 
   useEffect(() => {
     api.getDepartments().then(res => setDepartments(res.data)).catch(console.error);
     api.getDoctors().then(res => setDoctors(res.data)).catch(console.error);
-    api.getSchedules().then(res => setSchedules(res.data)).catch(console.error);
+    api.getSchedules().then(res => setSchedules(
+      res.data.map((schedule) => ({
+        ...schedule,
+        date: normalizeDateString(schedule.date),
+      }))
+    )).catch(console.error);
     // Pre-select dept from URL param (e.g. /book?dept=1)
     const deptParam = searchParams.get('dept');
     if (deptParam) {
