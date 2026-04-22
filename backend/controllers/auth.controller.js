@@ -2,26 +2,18 @@ const db = require('../data/db');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const { writeLog } = require('../utils/logger');
-
-const getJwtSecret = () => process.env.JWT_SECRET || 'fallback_secret_do_not_use_in_prod';
-const getRefreshSecret = () => process.env.JWT_REFRESH_SECRET || 'fallback_refresh_do_not_use_in_prod';
+const { jwtSecret, jwtRefreshSecret } = require('../config/env');
+const { AppError, sendSuccess, toAppError } = require('../utils/http');
 
 const generateTokens = (userPayload) => {
-    const secret = getJwtSecret();
-    const refreshSecret = getRefreshSecret();
-    
-    const accessToken = jwt.sign(userPayload, secret, { expiresIn: '15m' });
-    const refreshToken = jwt.sign(userPayload, refreshSecret, { expiresIn: '7d' });
+    const accessToken = jwt.sign(userPayload, jwtSecret, { expiresIn: '15m' });
+    const refreshToken = jwt.sign(userPayload, jwtRefreshSecret, { expiresIn: '7d' });
     return { accessToken, refreshToken };
 };
 
-exports.patientLogin = async (req, res) => {
+exports.patientLogin = async (req, res, next) => {
     try {
         const { phone, password } = req.body;
-        
-        if (!phone || !password) {
-            return res.status(400).json({ success: false, message: 'Vui lòng cung cấp số điện thoại và mật khẩu.' });
-        }
 
         const patient = await db.findPatientByPhone(phone);
         
@@ -30,24 +22,20 @@ exports.patientLogin = async (req, res) => {
             if (isMatch) {
                 const tokens = generateTokens({ id: patient.id, role: 'PATIENT' });
                 const { password: _, ...patientWithoutPassword } = patient;
-                return res.json({ success: true, user: patientWithoutPassword, ...tokens });
+                return sendSuccess(res, { user: patientWithoutPassword, ...tokens }, 'Đăng nhập thành công.');
             }
         }
         
-        return res.status(401).json({ success: false, message: 'Số điện thoại hoặc mật khẩu không đúng!' });
+        return next(new AppError('Số điện thoại hoặc mật khẩu không đúng!', 401));
     } catch (err) {
-        res.status(500).json({ success: false, message: 'Lỗi server', error: err.message });
+        next(toAppError(err));
     }
 };
 
-exports.staffLogin = async (req, res) => {
+exports.staffLogin = async (req, res, next) => {
     try {
         const username = (req.body.username || '').trim();
         const password = (req.body.password || '').trim();
-        
-        if (!username || !password) {
-            return res.status(400).json({ success: false, message: 'Vui lòng cung cấp tài khoản và mật khẩu.' });
-        }
 
         const staff = await db.findStaffByUsername(username);
         
@@ -55,32 +43,30 @@ exports.staffLogin = async (req, res) => {
             const isMatch = await bcrypt.compare(password, staff.password);
             if (isMatch) {
                 if (!staff.isActive) {
-                    return res.status(403).json({ success: false, message: 'Tài khoản của bạn đã bị vô hiệu hóa. Vui lòng liên hệ Admin.' });
+                    return next(new AppError('Tài khoản của bạn đã bị vô hiệu hóa. Vui lòng liên hệ Admin.', 403));
                 }
                 const tokens = generateTokens({ id: staff.id, role: staff.role });
 
                 writeLog('Đăng nhập hệ thống (JWT)', staff.name);
 
                 const { password: _, ...staffWithoutPassword } = staff;
-                return res.json({ success: true, user: staffWithoutPassword, ...tokens });
+                return sendSuccess(res, { user: staffWithoutPassword, ...tokens }, 'Đăng nhập thành công.');
             }
         }
         
-        return res.status(401).json({ success: false, message: 'Tài khoản hoặc mật khẩu không chính xác.' });
+        return next(new AppError('Tài khoản hoặc mật khẩu không chính xác.', 401));
     } catch (err) {
-        res.status(500).json({ success: false, message: 'Lỗi server', error: err.message });
+        next(toAppError(err));
     }
 };
 
-exports.refreshToken = (req, res) => {
+exports.refreshToken = (req, res, next) => {
     const { token } = req.body;
-    if (!token) return res.status(401).json({ message: 'Refresh Token required' });
+    if (!token) return next(new AppError('Refresh Token required', 401));
 
-    const refreshSecret = getRefreshSecret();
-
-    jwt.verify(token, refreshSecret, (err, user) => {
-        if (err) return res.status(403).json({ message: 'Invalid Refresh Token' });
+    jwt.verify(token, jwtRefreshSecret, (err, user) => {
+        if (err) return next(new AppError('Invalid Refresh Token', 403));
         const newTokens = generateTokens({ id: user.id, role: user.role });
-        res.json(newTokens);
+        return sendSuccess(res, newTokens, 'Làm mới token thành công.');
     });
 };

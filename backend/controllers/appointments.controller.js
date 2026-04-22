@@ -1,31 +1,32 @@
 const appointmentService = require('../services/appointments.service');
 const { writeLog } = require('../utils/logger');
 const db = require('../data/db');
+const { AppError, sendSuccess, toAppError } = require('../utils/http');
 
-exports.getAllAppointments = async (req, res) => {
+exports.getAllAppointments = async (req, res, next) => {
     try {
         const user = req.user;
         const result = await appointmentService.getAllAppointments(user);
-        res.json(result);
+        sendSuccess(res, result);
     } catch (err) {
-        res.status(500).json({ message: 'Lỗi server', error: err.message });
+        next(toAppError(err));
     }
 };
 
-exports.getAppointmentByCode = async (req, res) => {
+exports.getAppointmentByCode = async (req, res, next) => {
     try {
         const { code, phone } = req.query;
         const appt = await appointmentService.getAppointmentByCode(code, phone);
-        res.json(appt);
+        sendSuccess(res, appt);
     } catch (err) {
         if (err.message.includes('Thiếu') || err.message.includes('Không tìm thấy')) {
-             return res.status(err.message.includes('Thiếu') ? 400 : 404).json({ message: err.message });
+             return next(new AppError(err.message, err.message.includes('Thiếu') ? 400 : 404));
         }
-        res.status(500).json({ message: 'Lỗi server', error: err.message });
+        next(toAppError(err));
     }
 };
 
-exports.createAppointment = async (req, res) => {
+exports.createAppointment = async (req, res, next) => {
     try {
         const user = req.user;
         const newAppointment = await appointmentService.createAppointment(req.body, user);
@@ -33,7 +34,7 @@ exports.createAppointment = async (req, res) => {
         writeLog(`Đặt lịch mới: ${newAppointment.code} — ${newAppointment.patientName}`, user.name || 'Bệnh nhân');
         if (req.io) req.io.emit('new_appointment', newAppointment);
 
-        res.status(201).json(newAppointment);
+        sendSuccess(res, newAppointment, 'Đặt lịch thành công.', 201);
     } catch (err) {
         const msg = err.message;
         let status = 400;
@@ -42,11 +43,11 @@ exports.createAppointment = async (req, res) => {
         else if (msg.includes('Hệ thống ghi nhận') || msg.includes('quá nhanh')) status = 429;
         else if (msg.includes('Khung giờ này')) status = 409;
         
-        res.status(status).json({ message: msg });
+        next(new AppError(msg, status));
     }
 };
 
-exports.updateStatus = async (req, res) => {
+exports.updateStatus = async (req, res, next) => {
     try {
         const { id } = req.params;
         const { status } = req.body;
@@ -57,32 +58,32 @@ exports.updateStatus = async (req, res) => {
         writeLog(`Cập nhật trạng thái [${status}] cho ${updated.code}`, user.name || user.role);
         if (req.io) req.io.emit('update_appointment', updated);
 
-        res.json(updated);
+        sendSuccess(res, updated, 'Cập nhật trạng thái thành công.');
     } catch (err) {
         const msg = err.message;
-        if (msg.includes('Không tìm thấy')) return res.status(404).json({ message: msg });
-        if (msg.includes('không có quyền')) return res.status(403).json({ message: msg });
-        res.status(400).json({ message: msg });
+        if (msg.includes('Không tìm thấy')) return next(new AppError(msg, 404));
+        if (msg.includes('không có quyền')) return next(new AppError(msg, 403));
+        next(new AppError(msg, 400));
     }
 };
 
-exports.updateVitals = async (req, res) => {
+exports.updateVitals = async (req, res, next) => {
     try {
         const { id } = req.params;
         const { vitals } = req.body;
         const user = req.user;
 
         const updated = await appointmentService.updateVitals(id, vitals, user);
-        res.json(updated);
+        sendSuccess(res, updated, 'Lưu sinh hiệu thành công.');
     } catch (err) {
         const msg = err.message;
-        if (msg === 'Not found') return res.status(404).json({ message: msg });
-        if (msg.includes('không có quyền')) return res.status(403).json({ message: msg });
-        res.status(400).json({ message: msg });
+        if (msg === 'Not found') return next(new AppError(msg, 404));
+        if (msg.includes('không có quyền')) return next(new AppError(msg, 403));
+        next(new AppError(msg, 400));
     }
 };
 
-exports.completeMedicalRecord = async (req, res) => {
+exports.completeMedicalRecord = async (req, res, next) => {
     try {
         const { id } = req.params;
         const { record } = req.body;
@@ -90,30 +91,30 @@ exports.completeMedicalRecord = async (req, res) => {
 
         const updated = await appointmentService.completeMedicalRecord(id, record, user);
         writeLog('Khám xong & Lưu bệnh án', user.name || user.role);
-        res.json(updated);
+        sendSuccess(res, updated, 'Lưu bệnh án thành công.');
     } catch (err) {
         const msg = err.message;
-        if (msg === 'Not found') return res.status(404).json({ message: msg });
-        if (msg.includes('không có quyền')) return res.status(403).json({ message: msg });
-        res.status(400).json({ message: msg });
+        if (msg === 'Not found') return next(new AppError(msg, 404));
+        if (msg.includes('không có quyền')) return next(new AppError(msg, 403));
+        next(new AppError(msg, 400));
     }
 };
 
-exports.reschedule = async (req, res) => {
+exports.reschedule = async (req, res, next) => {
     try {
         const { id } = req.params;
         const user = req.user;
 
         const updated = await appointmentService.reschedule(id, req.body, user);
-        res.json(updated);
+        sendSuccess(res, updated, 'Đổi lịch thành công.');
     } catch (err) {
-        if (err.message === 'Not found') return res.status(404).json({ message: err.message });
-        if (err.message.includes('đạt giới hạn') || err.message.includes('Không tìm thấy lịch trống')) return res.status(409).json({ message: err.message });
-        res.status(400).json({ message: err.message });
+        if (err.message === 'Not found') return next(new AppError(err.message, 404));
+        if (err.message.includes('đạt giới hạn') || err.message.includes('Không tìm thấy lịch trống')) return next(new AppError(err.message, 409));
+        next(new AppError(err.message, 400));
     }
 };
 
-exports.markNoShow = async (req, res) => {
+exports.markNoShow = async (req, res, next) => {
     try {
         const { id } = req.params;
         const { reason } = req.body;
@@ -123,16 +124,16 @@ exports.markNoShow = async (req, res) => {
         writeLog(`Đánh dấu vắng mặt ${updated.code} — ${updated.patientName}`, user.name || user.role);
         if (req.io) req.io.emit('update_appointment', updated);
 
-        res.json(updated);
+        sendSuccess(res, updated, 'Đã đánh dấu vắng mặt.');
     } catch (err) {
         const msg = err.message;
         let status = 400;
         if (msg.includes('Không tìm thấy')) status = 404;
-        res.status(status).json({ message: msg });
+        next(new AppError(msg, status));
     }
 };
 
-exports.cancelAppointment = async (req, res) => {
+exports.cancelAppointment = async (req, res, next) => {
     try {
         const { id } = req.params;
         const { reason } = req.body;
@@ -143,18 +144,18 @@ exports.cancelAppointment = async (req, res) => {
         writeLog(`Hủy lịch khám ${updated.code} — ${updated.patientName}`, user.name || user.role);
         if (req.io) req.io.emit('update_appointment', updated);
 
-        res.json(updated);
+        sendSuccess(res, updated, 'Hủy lịch thành công.');
     } catch (err) {
         const msg = err.message;
         let status = 400;
         if (msg.includes('Không tìm thấy')) status = 404;
         else if (msg.includes('Bạn không có quyền')) status = 403;
         
-        res.status(status).json({ message: msg });
+        next(new AppError(msg, status));
     }
 };
 
-exports.transferPatient = async (req, res) => {
+exports.transferPatient = async (req, res, next) => {
     try {
         const { id } = req.params;
         const user = req.user;
@@ -172,25 +173,25 @@ exports.transferPatient = async (req, res) => {
             });
         }
 
-        res.json({
-            message: `Hồ sơ đã được chuyển thành công sang ${targetDept.name}`,
+        sendSuccess(res, {
             appointment: updated,
-            transfer: transferRecord
-        });
+            transfer: transferRecord,
+            targetDept
+        }, `Hồ sơ đã được chuyển thành công sang ${targetDept.name}`);
     } catch (err) {
         const msg = err.message;
         let status = 400;
         if (msg.includes('Không tìm thấy')) status = 404;
         
-        res.status(status).json({ message: msg });
+        next(new AppError(msg, status));
     }
 };
 
-exports.getEmergencyTransfers = async (req, res) => {
+exports.getEmergencyTransfers = async (req, res, next) => {
     try {
         const transfers = await db.getEmergencyTransfers();
-        res.json(transfers);
+        sendSuccess(res, transfers);
     } catch (err) {
-        res.status(500).json({ message: 'Lỗi server', error: err.message });
+        next(toAppError(err));
     }
 };

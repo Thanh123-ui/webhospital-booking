@@ -1,4 +1,5 @@
 const db = require('../data/db');
+const { AppError, sendSuccess, toAppError } = require('../utils/http');
 
 const NURSE_VISIBLE_STATUSES = new Set([
     'ARRIVED',
@@ -31,7 +32,7 @@ function sanitizePatient(patient) {
     return patientWithoutPassword;
 }
 
-exports.getAllPatients = async (req, res) => {
+exports.getAllPatients = async (req, res, next) => {
     try {
         const { role, id } = req.user;
         const patients = await db.getPatients();
@@ -43,7 +44,7 @@ exports.getAllPatients = async (req, res) => {
             const currentStaff = staffList.find(s => s.id === parseInt(id));
 
             if (!currentStaff?.deptId) {
-                return res.json([]);
+                return sendSuccess(res, []);
             }
 
             const parsedDeptId = parseInt(currentStaff.deptId);
@@ -74,19 +75,19 @@ exports.getAllPatients = async (req, res) => {
             .map(sanitizePatient)
             .sort((a, b) => a.name.localeCompare(b.name, 'vi'));
 
-        res.json(result);
+        sendSuccess(res, result);
     } catch (err) {
-        res.status(500).json({ message: 'Lỗi server', error: err.message });
+        next(toAppError(err));
     }
 };
 
-exports.registerPatient = async (req, res) => {
+exports.registerPatient = async (req, res, next) => {
     try {
         const data = req.body;
 
         const exists = await db.findPatientByPhone(data.phone);
         if (exists) {
-            return res.status(400).json({ success: false, message: 'Số điện thoại này đã được đăng ký!' });
+            return next(new AppError('Số điện thoại này đã được đăng ký!', 400));
         }
 
         const nextId = await db.nextPatientId();
@@ -105,49 +106,49 @@ exports.registerPatient = async (req, res) => {
         };
 
         await db.addPatient(newPatient);
-        res.status(201).json({ success: true, user: sanitizePatient(newPatient) });
+        sendSuccess(res, { user: sanitizePatient(newPatient) }, 'Đăng ký bệnh nhân thành công.', 201);
     } catch (err) {
-        res.status(500).json({ success: false, message: 'Lỗi server', error: err.message });
+        next(toAppError(err));
     }
 };
 
-exports.getPatientById = async (req, res) => {
+exports.getPatientById = async (req, res, next) => {
     try {
         const requestedId = parseInt(req.params.id);
         const requester = req.user;
 
         if (requester.role === 'PATIENT' && requester.id !== requestedId) {
-            return res.status(403).json({ success: false, message: 'Bạn không có quyền xem hồ sơ của bệnh nhân khác.' });
+            return next(new AppError('Bạn không có quyền xem hồ sơ của bệnh nhân khác.', 403));
         }
 
         const patient = await db.findPatientById(requestedId);
         if (!patient) {
-            return res.status(404).json({ success: false, message: 'Không tìm thấy bệnh nhân' });
+            return next(new AppError('Không tìm thấy bệnh nhân', 404));
         }
 
-        res.json({ success: true, user: sanitizePatient(patient) });
+        sendSuccess(res, { user: sanitizePatient(patient) });
     } catch (err) {
-        res.status(500).json({ success: false, message: 'Lỗi server', error: err.message });
+        next(toAppError(err));
     }
 };
 
-exports.updatePatient = async (req, res) => {
+exports.updatePatient = async (req, res, next) => {
     try {
         const { id } = req.params;
         const { cccd, dob, gender } = req.body;
         const requester = req.user;
 
         if (requester.role === 'PATIENT' && requester.id !== parseInt(id)) {
-            return res.status(403).json({ success: false, message: 'Bạn không có quyền cập nhật hồ sơ của bệnh nhân khác.' });
+            return next(new AppError('Bạn không có quyền cập nhật hồ sơ của bệnh nhân khác.', 403));
         }
 
         const updated = await db.updatePatient(parseInt(id), { cccd, dob, gender });
         if (!updated) {
-            return res.status(404).json({ success: false, message: 'Không tìm thấy bệnh nhân' });
+            return next(new AppError('Không tìm thấy bệnh nhân', 404));
         }
 
-        res.json({ success: true, user: sanitizePatient(updated) });
+        sendSuccess(res, { user: sanitizePatient(updated) }, 'Cập nhật hồ sơ thành công.');
     } catch (err) {
-        res.status(500).json({ success: false, message: 'Lỗi server', error: err.message });
+        next(toAppError(err));
     }
 };

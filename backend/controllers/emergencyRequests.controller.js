@@ -1,6 +1,7 @@
 const emergencyRequestsService = require('../services/emergencyRequests.service');
 const { writeLog } = require('../utils/logger');
 const db = require('../data/db');
+const { AppError, sendSuccess, toAppError } = require('../utils/http');
 
 async function ensureEmergencyAccess(user) {
   if (!user?.id || !user?.role) {
@@ -31,34 +32,34 @@ async function ensureEmergencyAccess(user) {
   }
 }
 
-exports.createEmergencyRequest = async (req, res) => {
+exports.createEmergencyRequest = async (req, res, next) => {
   try {
     const request = await emergencyRequestsService.createEmergencyRequest(req.body);
 
     writeLog(`Yêu cầu cấp cứu mới: ${request.code} — ${request.requesterName}`, 'Cổng cấp cứu');
     if (req.io) req.io.to('emergency_alerts').emit('new_emergency_request', request);
 
-    res.status(201).json(request);
+    sendSuccess(res, request, 'Đã ghi nhận yêu cầu cấp cứu.', 201);
   } catch (err) {
     const msg = err.message;
     let status = 400;
     if (msg.includes('đã ghi nhận') || msg.includes('quá nhiều')) status = 429;
 
-    res.status(status).json({ message: msg });
+    next(new AppError(msg, status));
   }
 };
 
-exports.getAllEmergencyRequests = async (req, res) => {
+exports.getAllEmergencyRequests = async (req, res, next) => {
   try {
     await ensureEmergencyAccess(req.user);
     const requests = await emergencyRequestsService.getAllEmergencyRequests();
-    res.json(requests);
+    sendSuccess(res, requests);
   } catch (err) {
-    res.status(err.status || 500).json({ message: err.message || 'Lỗi server', error: err.message });
+    next(toAppError(err));
   }
 };
 
-exports.updateEmergencyRequestStatus = async (req, res) => {
+exports.updateEmergencyRequestStatus = async (req, res, next) => {
   try {
     await ensureEmergencyAccess(req.user);
     const updated = await emergencyRequestsService.updateEmergencyRequestStatus(req.params.id, req.body, req.user);
@@ -66,12 +67,12 @@ exports.updateEmergencyRequestStatus = async (req, res) => {
     writeLog(`Cập nhật yêu cầu cấp cứu ${updated.code} -> ${updated.status}`, req.user.name || req.user.role);
     if (req.io) req.io.to('emergency_alerts').emit('update_emergency_request', updated);
 
-    res.json(updated);
+    sendSuccess(res, updated, 'Cập nhật yêu cầu cấp cứu thành công.');
   } catch (err) {
     const msg = err.message;
     let status = err.status || 400;
     if (msg.includes('Không tìm thấy')) status = 404;
 
-    res.status(status).json({ message: msg });
+    next(new AppError(msg, status));
   }
 };

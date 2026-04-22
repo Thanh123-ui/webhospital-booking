@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from 'react';
+﻿import React, { startTransition, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Activity, Calendar, Users, Settings, LogOut, Stethoscope,
@@ -55,6 +55,8 @@ const AdminDashboard = () => {
   const [staffList, setStaffList] = useState([]);
   const [logsList, setLogsList] = useState([]);
   const [currentTimestamp, setCurrentTimestamp] = useState(() => Date.now());
+  const [dashboardLoading, setDashboardLoading] = useState(() => Boolean(currentStaffUser));
+  const [dashboardError, setDashboardError] = useState('');
 
   const [newStaff, setNewStaff] = useState({ name: '', username: '', password: '', role: 'DOCTOR', title: '', deptId: '', exp: '' });
   const [examModal, setExamModal] = useState(null);
@@ -105,12 +107,19 @@ const AdminDashboard = () => {
     return assignedDoctor?.deptId ? parseInt(assignedDoctor.deptId) : null;
   };
 
-  const fetchAppointments = () => api.getAllAppointments(currentStaffUser.role, currentStaffUser.deptId).then(res => setAppointments(res.data)).catch(console.error);
-  const fetchEmergencyRequests = () => api.getEmergencyRequests().then(res => setEmergencyRequests(res.data)).catch(console.error);
-  const fetchPatients    = () => api.getAllPatients(currentStaffUser.role, currentStaffUser.deptId).then(res => setPatients(res.data)).catch(console.error);
-  const fetchStaff       = () => api.getAllStaff().then(res => setStaffList(res.data)).catch(console.error);
-  const fetchLogs        = () => api.getSystemLogs().then(res => setLogsList(res.data)).catch(console.error);
-
+  const getErrorMessage = (err, fallback) => err?.response?.data?.message || fallback;
+  const fetchAppointments = () => api.getAllAppointments(currentStaffUser.role, currentStaffUser.deptId).then(res => setAppointments(res.data)).catch((err) => {
+    setDashboardError(getErrorMessage(err, 'Không tải được danh sách lịch hẹn.'));
+  });
+  const fetchEmergencyRequests = () => api.getEmergencyRequests().then(res => setEmergencyRequests(res.data)).catch((err) => {
+    setDashboardError(getErrorMessage(err, 'Không tải được danh sách yêu cầu cấp cứu.'));
+  });
+  const fetchPatients = () => api.getAllPatients(currentStaffUser.role, currentStaffUser.deptId).then(res => setPatients(res.data)).catch((err) => {
+    setDashboardError(getErrorMessage(err, 'Không tải được danh sách bệnh nhân.'));
+  });
+  const fetchStaff = () => api.getAllStaff().then(res => setStaffList(res.data)).catch((err) => {
+    setDashboardError(getErrorMessage(err, 'Không tải được danh sách nhân sự.'));
+  });
   const currentDept = departments.find(d => d.id === currentStaffUser?.deptId);
   const isEmergencyDept = currentDept?.isEmergency;
   const canAccessEmergencyAlerts = role === 'RECEPTIONIST' || (['DOCTOR', 'NURSE'].includes(role) && isEmergencyDept);
@@ -138,19 +147,46 @@ const AdminDashboard = () => {
 
   useEffect(() => {
     if (!currentStaffUser) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setEmergencyRequests([]);
       return;
     }
 
-    fetchAppointments();
-    api.getDepartments().then(res => setDepartments(res.data)).catch(console.error);
-    if (PERMS.canViewPatients(role)) fetchPatients();
-    if (PERMS.canViewStaff(role)) fetchStaff();
-    if (PERMS.canViewLogs(role)) fetchLogs();
-    if (canAccessEmergencyAlerts) fetchEmergencyRequests();
-    else setEmergencyRequests([]);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    startTransition(() => {
+      setDashboardLoading(true);
+      setDashboardError('');
+    });
+
+    const tasks = [
+      api.getAllAppointments(currentStaffUser.role, currentStaffUser.deptId).then((res) => setAppointments(res.data)),
+      api.getDepartments().then((res) => setDepartments(res.data)),
+    ];
+
+    if (PERMS.canViewPatients(role)) {
+      tasks.push(api.getAllPatients(currentStaffUser.role, currentStaffUser.deptId).then((res) => setPatients(res.data)));
+    }
+    if (PERMS.canViewStaff(role)) {
+      tasks.push(api.getAllStaff().then((res) => setStaffList(res.data)));
+    }
+    if (PERMS.canViewLogs(role)) {
+      tasks.push(api.getSystemLogs().then((res) => setLogsList(res.data)));
+    }
+    if (canAccessEmergencyAlerts) {
+      tasks.push(api.getEmergencyRequests().then((res) => setEmergencyRequests(res.data)));
+    } else {
+      startTransition(() => {
+        setEmergencyRequests([]);
+      });
+    }
+
+    Promise.all(tasks)
+      .then(() => {
+        setDashboardError('');
+      })
+      .catch((err) => {
+        setDashboardError(getErrorMessage(err, 'Không tải được dữ liệu bảng điều hành.'));
+      })
+      .finally(() => {
+        setDashboardLoading(false);
+      });
   }, [currentStaffUser, role, canAccessEmergencyAlerts]);
 
   useEffect(() => {
@@ -399,6 +435,17 @@ const AdminDashboard = () => {
 
   return (
     <div className="flex min-h-screen bg-[linear-gradient(180deg,#f8f9fa_0%,#eef3f6_100%)] font-body text-on-surface">
+      {dashboardError ? (
+        <div className="fixed left-1/2 top-24 z-40 w-[min(92vw,42rem)] -translate-x-1/2 rounded-2xl border border-red-100 bg-white px-5 py-4 text-sm text-red-600 shadow-[0_20px_40px_rgba(148,24,24,0.08)]">
+          {dashboardError}
+        </div>
+      ) : null}
+
+      {dashboardLoading ? (
+        <div className="fixed left-1/2 top-24 z-30 w-[min(92vw,28rem)] -translate-x-1/2 rounded-2xl border border-sky-100 bg-white px-5 py-4 text-sm font-medium text-slate-600 shadow-[0_20px_40px_rgba(15,87,120,0.08)]">
+          Đang tải dữ liệu bảng điều hành...
+        </div>
+      ) : null}
 
       {/* SIDEBAR */}
       <aside className="hidden w-72 shrink-0 flex-col border-r border-white/10 bg-[linear-gradient(180deg,#0f5778_0%,#0b4462_48%,#072c41_100%)] shadow-[0_24px_48px_rgba(4,24,36,0.24)] lg:flex">

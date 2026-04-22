@@ -1,4 +1,5 @@
 const jwt = require('jsonwebtoken');
+const { jwtSecret } = require('../config/env');
 
 exports.verifyToken = (req, res, next) => {
     try {
@@ -12,9 +13,7 @@ exports.verifyToken = (req, res, next) => {
             return res.status(401).json({ success: false, message: 'Access Denied: Invalid Token Format!' });
         }
 
-        const secret = process.env.JWT_SECRET || 'fallback_secret_do_not_use_in_prod';
-
-        const decoded = jwt.verify(token, secret);
+        const decoded = jwt.verify(token, jwtSecret);
         req.user = decoded; // Contains id, role, etc.
         next();
     } catch (err) {

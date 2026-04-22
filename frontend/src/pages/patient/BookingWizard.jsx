@@ -43,6 +43,8 @@ const BookingWizard = () => {
   const [bookingData, setBookingData] = useState(() => buildInitialBookingData(currentPatient, searchParams));
   const [bookedCode, setBookedCode] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
+  const [loadingData, setLoadingData] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
   
   const [departments, setDepartments] = useState([]);
   const [doctors, setDoctors] = useState([]);
@@ -83,14 +85,36 @@ const BookingWizard = () => {
   };
 
   useEffect(() => {
-    api.getDepartments().then(res => setDepartments(res.data)).catch(console.error);
-    api.getDoctors().then(res => setDoctors(res.data)).catch(console.error);
-    api.getSchedules().then(res => setSchedules(
-      res.data.map((schedule) => ({
-        ...schedule,
-        date: normalizeDateString(schedule.date),
-      }))
-    )).catch(console.error);
+    let isMounted = true;
+
+    Promise.all([
+      api.getDepartments(),
+      api.getDoctors(),
+      api.getSchedules(),
+    ])
+      .then(([departmentsRes, doctorsRes, schedulesRes]) => {
+        if (!isMounted) return;
+        setDepartments(departmentsRes.data);
+        setDoctors(doctorsRes.data);
+        setSchedules(
+          schedulesRes.data.map((schedule) => ({
+            ...schedule,
+            date: normalizeDateString(schedule.date),
+          }))
+        );
+        setErrorMessage('');
+      })
+      .catch((err) => {
+        if (!isMounted) return;
+        setErrorMessage(err?.response?.data?.message || 'Không tải được dữ liệu đặt lịch. Vui lòng thử lại sau.');
+      })
+      .finally(() => {
+        if (isMounted) setLoadingData(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -140,6 +164,7 @@ const BookingWizard = () => {
 
   const handleBooking = async (e) => {
     e.preventDefault();
+    setSubmitting(true);
     try {
       if (currentPatient) {
         const hasProfileChanges =
@@ -176,6 +201,8 @@ const BookingWizard = () => {
     } catch(err) {
       const msg = err?.response?.data?.message || "Bệnh viện hiện không thể tiếp nhận yêu cầu. Quý khách vui lòng thử lại sau.";
       setErrorMessage(msg);
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -190,6 +217,12 @@ const BookingWizard = () => {
             <h2 className="text-2xl font-bold mb-8 text-slate-800 border-b pb-4 flex items-center gap-2">
               <CalendarCheck className="text-blue-600"/> Đặt lịch khám bệnh
             </h2>
+
+            {loadingData && (
+              <div className="mb-6 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-600">
+                Đang tải dữ liệu bác sĩ và lịch khám...
+              </div>
+            )}
             
             <div className="flex items-center justify-between mb-10 relative px-2">
               <div className="absolute left-0 top-1/2 w-full h-1 bg-slate-100 -z-10"></div>
@@ -368,8 +401,8 @@ const BookingWizard = () => {
                 </div>
                 
                 <div className="pt-2 flex justify-end">
-                  <button type="submit" className="w-full md:w-auto bg-green-600 hover:bg-green-700 text-white px-10 py-4 rounded-xl font-bold text-lg shadow-lg shadow-green-600/30 transition-colors flex items-center justify-center gap-2">
-                    <Check size={24}/> Hoàn tất đặt lịch
+                  <button type="submit" disabled={submitting} className="w-full md:w-auto bg-green-600 hover:bg-green-700 text-white px-10 py-4 rounded-xl font-bold text-lg shadow-lg shadow-green-600/30 transition-colors flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-60">
+                    <Check size={24}/> {submitting ? 'Đang gửi yêu cầu' : 'Hoàn tất đặt lịch'}
                   </button>
                 </div>
               </form>

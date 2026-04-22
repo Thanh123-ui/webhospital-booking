@@ -59,10 +59,30 @@ const PatientHome = () => {
   const navigate = useNavigate();
   const [departments, setDepartments] = useState([]);
   const [doctors, setDoctors] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
 
   useEffect(() => {
-    api.getDepartments().then((res) => setDepartments(res.data)).catch(console.error);
-    api.getTopDoctors().then((res) => setDoctors(res.data)).catch(console.error);
+    let isMounted = true;
+
+    Promise.all([api.getDepartments(), api.getTopDoctors()])
+      .then(([departmentsRes, doctorsRes]) => {
+        if (!isMounted) return;
+        setDepartments(departmentsRes.data);
+        setDoctors(doctorsRes.data);
+        setLoadError('');
+      })
+      .catch((err) => {
+        if (!isMounted) return;
+        setLoadError(err?.response?.data?.message || 'Không tải được dữ liệu trang chủ lúc này.');
+      })
+      .finally(() => {
+        if (isMounted) setLoading(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const featuredDoctors = doctors
@@ -186,6 +206,18 @@ const PatientHome = () => {
 
       <section id="departments" className="bg-surface-bright py-24">
         <div className="page-shell">
+          {loadError ? (
+            <div className="mb-10 rounded-2xl border border-error/15 bg-white/80 px-5 py-4 text-sm text-error shadow-soft">
+              {loadError}
+            </div>
+          ) : null}
+
+          {loading ? (
+            <div className="mb-10 rounded-[2rem] bg-surface-container-low px-6 py-5 text-sm font-medium text-on-surface-variant">
+              Đang tải chuyên khoa và bác sĩ...
+            </div>
+          ) : null}
+
           <div className="mb-14 flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
             <div>
               <h2 className="text-4xl font-bold text-on-surface">Chuyên khoa nổi bật</h2>

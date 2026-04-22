@@ -1,4 +1,6 @@
 const db = require('../data/db');
+const { AppError, sendSuccess, toAppError } = require('../utils/http');
+const { getLogs } = require('../utils/logger');
 
 function sanitizeDoctor(doctor) {
   if (!doctor) return doctor;
@@ -6,37 +8,37 @@ function sanitizeDoctor(doctor) {
   return doctorWithoutSecrets;
 }
 
-exports.getDepartments = async (req, res) => {
+exports.getDepartments = async (req, res, next) => {
   try {
     const departments = await db.getDepartments();
-    res.json(departments);
+    sendSuccess(res, departments);
   } catch (err) {
-    res.status(500).json({ message: 'Lỗi server', error: err.message });
+    next(toAppError(err));
   }
 };
 
-exports.getDoctors = async (req, res) => {
+exports.getDoctors = async (req, res, next) => {
   try {
     const doctors = await db.getDoctors();
-    res.json(doctors.map(sanitizeDoctor));
+    sendSuccess(res, doctors.map(sanitizeDoctor));
   } catch (err) {
-    res.status(500).json({ message: 'Lỗi server', error: err.message });
+    next(toAppError(err));
   }
 };
 
-exports.getSchedules = async (req, res) => {
+exports.getSchedules = async (req, res, next) => {
   try {
     const schedules = await db.getSchedules();
-    res.json(schedules);
+    sendSuccess(res, schedules);
   } catch (err) {
-    res.status(500).json({ message: 'Lỗi server', error: err.message });
+    next(toAppError(err));
   }
 };
 
-exports.rateDoctor = async (req, res) => {
+exports.rateDoctor = async (req, res, next) => {
   try {
     const { apptId, doctorName, rating, comment } = req.body;
-    if (!rating) return res.status(400).json({ message: 'Missing rating' });
+    if (!rating) throw new AppError('Missing rating', 400);
 
     await db.addRating({
       id: Date.now(),
@@ -47,13 +49,13 @@ exports.rateDoctor = async (req, res) => {
       date: new Date().toISOString()
     });
 
-    return res.json({ message: 'Rated successfully' });
+    return sendSuccess(res, null, 'Rated successfully');
   } catch (err) {
-    res.status(500).json({ message: 'Lỗi server', error: err.message });
+    next(toAppError(err));
   }
 };
 
-exports.getTopDoctors = async (req, res) => {
+exports.getTopDoctors = async (req, res, next) => {
   try {
     const [doctors, ratings] = await Promise.all([db.getDoctors(), db.getRatings()]);
 
@@ -76,8 +78,12 @@ exports.getTopDoctors = async (req, res) => {
 
     // Sort descending
     doctorsWithRating.sort((a, b) => b.avgRating - a.avgRating);
-    res.json(doctorsWithRating);
+    sendSuccess(res, doctorsWithRating);
   } catch (err) {
-    res.status(500).json({ message: 'Lỗi server', error: err.message });
+    next(toAppError(err));
   }
+};
+
+exports.getSystemLogs = (req, res) => {
+  return sendSuccess(res, getLogs());
 };

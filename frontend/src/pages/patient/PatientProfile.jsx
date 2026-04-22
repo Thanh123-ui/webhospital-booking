@@ -8,6 +8,8 @@ const PatientProfile = () => {
   const { currentPatient, setCurrentPatient } = useAuth();
   const [appointments, setAppointments] = useState([]);
   const [printData, setPrintData] = useState(null);
+  const [loadingProfile, setLoadingProfile] = useState(() => Boolean(currentPatient?.id));
+  const [pageError, setPageError] = useState('');
   
   const [ratingModal, setRatingModal] = useState(null);
   const [ratingVal, setRatingVal] = useState(5);
@@ -36,23 +38,46 @@ const PatientProfile = () => {
     if (currentPatient) {
       api.getAllAppointments(undefined, undefined, 'patient')
         .then(res => setAppointments(res.data))
-        .catch(console.error);
+        .catch((err) => {
+          setPageError(err?.response?.data?.message || 'Không tải được danh sách lịch hẹn.');
+        });
     }
   }
 
   useEffect(() => {
+    let isMounted = true;
+
     if (currentPatient?.id) {
       api.getPatientById(currentPatient.id, 'patient')
-        .then((res) => setCurrentPatient(res.data.user))
-        .catch(console.error);
+        .then((res) => {
+          if (!isMounted) return;
+          setCurrentPatient(res.data.user);
+          setPageError('');
+        })
+        .catch((err) => {
+          if (!isMounted) return;
+          setPageError(err?.response?.data?.message || 'Không tải được hồ sơ bệnh nhân.');
+        })
+        .finally(() => {
+          if (isMounted) setLoadingProfile(false);
+        });
     }
+
+    return () => {
+      isMounted = false;
+    };
   }, [currentPatient?.id, setCurrentPatient]);
 
   useEffect(() => {
     if (currentPatient) {
       api.getAllAppointments(undefined, undefined, 'patient')
-        .then(res => setAppointments(res.data))
-        .catch(console.error);
+        .then((res) => {
+          setAppointments(res.data);
+          setPageError('');
+        })
+        .catch((err) => {
+          setPageError(err?.response?.data?.message || 'Không tải được lịch hẹn của bạn.');
+        });
     }
   }, [currentPatient]);
 
@@ -90,10 +115,26 @@ const PatientProfile = () => {
     }
   }
 
+  if (!currentPatient && loadingProfile) {
+    return (
+      <div className="max-w-5xl mx-auto px-4 py-10">
+        <div className="rounded-3xl border border-slate-100 bg-white p-6 text-sm font-medium text-slate-500 shadow-sm">
+          Đang tải hồ sơ bệnh nhân...
+        </div>
+      </div>
+    );
+  }
+
   if (!currentPatient) return null;
 
   return (
     <div className="max-w-5xl mx-auto py-10 px-4 animate-in fade-in">
+      {pageError ? (
+        <div className="mb-6 rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-600">
+          {pageError}
+        </div>
+      ) : null}
+
       <div className="flex flex-col md:flex-row gap-8">
         
         {/* Sidebar Info */}

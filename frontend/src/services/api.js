@@ -1,9 +1,36 @@
 import axios from 'axios';
 
-// Nếu chạy local (DEV) thì trỏ thẳng vào backend port 5000
-// Nếu chạy trên AWS (Production) thì dùng đường dẫn tương đối '/api'
-const API_URL = import.meta.env.VITE_API_URL
-  || (import.meta.env.DEV ? 'http://localhost:5000/api' : '/api');
+const API_URL = import.meta.env.VITE_API_URL || '/api';
+
+const normalizeSuccessPayload = (response) => {
+  const payload = response?.data;
+  if (!payload || payload.success !== true || !Object.prototype.hasOwnProperty.call(payload, 'data')) {
+    return response;
+  }
+
+  const normalizedData = payload.data;
+  if (Array.isArray(normalizedData)) {
+    response.data = normalizedData;
+    return response;
+  }
+
+  if (normalizedData && typeof normalizedData === 'object') {
+    response.data = {
+      success: true,
+      ...(payload.message ? { message: payload.message } : {}),
+      ...normalizedData,
+    };
+    return response;
+  }
+
+  response.data = {
+    success: true,
+    ...(payload.message ? { message: payload.message } : {}),
+    data: normalizedData,
+  };
+
+  return response;
+};
 
 const apiClient = axios.create({
   baseURL: API_URL,
@@ -44,6 +71,9 @@ const refreshClient = axios.create({
   baseURL: API_URL,
   headers: { 'Content-Type': 'application/json' }
 });
+
+apiClient.interceptors.response.use(normalizeSuccessPayload);
+refreshClient.interceptors.response.use(normalizeSuccessPayload);
 
 const clearAuthStorage = (authType) => {
   if (!authType) return;

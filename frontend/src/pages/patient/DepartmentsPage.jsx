@@ -54,10 +54,30 @@ const DepartmentsPage = () => {
   const navigate = useNavigate();
   const [departments, setDepartments] = useState([]);
   const [doctors, setDoctors] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
 
   useEffect(() => {
-    api.getDepartments().then((res) => setDepartments(res.data)).catch(console.error);
-    api.getDoctors().then((res) => setDoctors(res.data)).catch(console.error);
+    let isMounted = true;
+
+    Promise.all([api.getDepartments(), api.getDoctors()])
+      .then(([departmentsRes, doctorsRes]) => {
+        if (!isMounted) return;
+        setDepartments(departmentsRes.data);
+        setDoctors(doctorsRes.data);
+        setLoadError('');
+      })
+      .catch((err) => {
+        if (!isMounted) return;
+        setLoadError(err?.response?.data?.message || 'Không tải được danh sách chuyên khoa.');
+      })
+      .finally(() => {
+        if (isMounted) setLoading(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const visibleDepartments = useMemo(
@@ -99,6 +119,18 @@ const DepartmentsPage = () => {
 
       <section className="pb-24">
         <div className="page-shell">
+          {loadError ? (
+            <div className="mb-10 rounded-2xl border border-error/15 bg-white px-5 py-4 text-sm text-error shadow-soft">
+              {loadError}
+            </div>
+          ) : null}
+
+          {loading ? (
+            <div className="mb-10 rounded-[2rem] bg-surface-container-low px-6 py-5 text-sm font-medium text-on-surface-variant">
+              Đang tải dữ liệu chuyên khoa...
+            </div>
+          ) : null}
+
           <div className="mb-12 grid gap-6 md:grid-cols-2 xl:grid-cols-4">
             {visibleDepartments.map((dept) => {
               const Icon = DEPT_ICONS[dept.name] || Stethoscope;

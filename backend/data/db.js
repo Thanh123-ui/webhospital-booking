@@ -266,6 +266,7 @@ else if (DB_MODE === 'mysql') {
   // Pool kết nối (tái sử dụng connection, auto-reconnect)
   const pool = mysql.createPool({
     host: process.env.DB_HOST || 'localhost',
+    port: parseInt(process.env.DB_PORT || '3306', 10),
     user: process.env.DB_USER || 'root',
     password: process.env.DB_PASSWORD || '',
     database: process.env.DB_NAME || 'hospital_booking',
@@ -279,12 +280,12 @@ else if (DB_MODE === 'mysql') {
   // Kiểm tra kết nối ngay khi khởi động
   pool.getConnection()
     .then(conn => {
-      console.log(`✅  [DB] Kết nối MySQL thành công → ${process.env.DB_HOST}/${process.env.DB_NAME}`);
+      console.log(`✅  [DB] Kết nối MySQL thành công → ${process.env.DB_HOST}:${process.env.DB_PORT || '3306'}/${process.env.DB_NAME}`);
       conn.release();
     })
     .catch(err => {
       console.error('❌  [DB] Không thể kết nối MySQL:', err.message);
-      console.error('    Kiểm tra lại DB_HOST, DB_USER, DB_PASSWORD, DB_NAME trong file .env');
+      console.error('    Kiểm tra lại DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME trong file .env');
       process.exit(1); // Dừng server nếu DB không kết nối được
     });
 
