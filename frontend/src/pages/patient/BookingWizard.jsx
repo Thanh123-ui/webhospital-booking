@@ -21,12 +21,26 @@ const getDoctorInitials = (name = '') =>
     .join('')
     .toUpperCase();
 
+const buildInitialBookingData = (currentPatient, searchParams) => ({
+  dept: searchParams.get('dept') ? parseInt(searchParams.get('dept'), 10) : '',
+  doctorId: '',
+  date: '',
+  time: '',
+  name: currentPatient?.name || '',
+  phone: currentPatient?.phone || '',
+  email: currentPatient?.email || '',
+  dob: currentPatient?.dob || '',
+  cccd: currentPatient?.cccd || '',
+  gender: (currentPatient?.gender && currentPatient.gender !== 'Unknown') ? currentPatient.gender : '',
+  symptoms: '',
+});
+
 const BookingWizard = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { currentPatient, setCurrentPatient } = useAuth();
   const [step, setStep] = useState(1);
-  const [bookingData, setBookingData] = useState({ dept: '', doctorId: '', date: '', time: '', name: '', phone: '', email: '', dob: '', cccd: '', gender: '', symptoms: '' });
+  const [bookingData, setBookingData] = useState(() => buildInitialBookingData(currentPatient, searchParams));
   const [bookedCode, setBookedCode] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   
@@ -77,15 +91,12 @@ const BookingWizard = () => {
         date: normalizeDateString(schedule.date),
       }))
     )).catch(console.error);
-    // Pre-select dept from URL param (e.g. /book?dept=1)
-    const deptParam = searchParams.get('dept');
-    if (deptParam) {
-      setBookingData(prev => ({ ...prev, dept: parseInt(deptParam) }));
-    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     if (currentPatient) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setBookingData(prev => ({ 
         ...prev, 
         name: currentPatient.name, 

@@ -27,15 +27,9 @@ const PatientProfile = () => {
        const res = await api.updatePatientProfile(currentPatient.id, profileData, 'patient');
        setCurrentPatient(res.data.user);
        setEditProfileModal(false);
-    } catch(err) {
+    } catch {
        alert("Lỗi cập nhật thông tin.");
     }
-  };
-
-  const refreshPatientProfile = async (patientId) => {
-    const res = await api.getPatientById(patientId, 'patient');
-    setCurrentPatient(res.data.user);
-    return res.data.user;
   };
 
   const fetchAppts = () => {
@@ -48,13 +42,19 @@ const PatientProfile = () => {
 
   useEffect(() => {
     if (currentPatient?.id) {
-      refreshPatientProfile(currentPatient.id).catch(console.error);
+      api.getPatientById(currentPatient.id, 'patient')
+        .then((res) => setCurrentPatient(res.data.user))
+        .catch(console.error);
     }
-  }, [currentPatient?.id]);
+  }, [currentPatient?.id, setCurrentPatient]);
 
   useEffect(() => {
-    fetchAppts();
-  }, [currentPatient?.phone]);
+    if (currentPatient) {
+      api.getAllAppointments(undefined, undefined, 'patient')
+        .then(res => setAppointments(res.data))
+        .catch(console.error);
+    }
+  }, [currentPatient]);
 
   const handleSubmitRating = async (e) => {
      e.preventDefault();
@@ -65,7 +65,7 @@ const PatientProfile = () => {
        setRatingModal(null);
        setRatingVal(5);
        setRatingComment('');
-     } catch (err) {
+     } catch {
        alert("Lỗi Gửi đánh giá.");
      }
   }
