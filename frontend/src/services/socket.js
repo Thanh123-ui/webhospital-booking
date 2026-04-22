@@ -1,9 +1,7 @@
 import { io } from 'socket.io-client';
 
-const SERVER_HOST = window.location.hostname;
-const URL = import.meta.env.DEV
-  ? `http://${SERVER_HOST}:5000`
-  : window.location.origin;
+const URL = import.meta.env.VITE_SOCKET_URL
+  || (import.meta.env.DEV ? `http://${window.location.hostname}:5000` : window.location.origin);
 
 export const socket = io(URL, {
   autoConnect: false

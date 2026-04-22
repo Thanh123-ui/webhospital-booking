@@ -2,7 +2,8 @@ import axios from 'axios';
 
 // Nếu chạy local (DEV) thì trỏ thẳng vào backend port 5000
 // Nếu chạy trên AWS (Production) thì dùng đường dẫn tương đối '/api'
-const API_URL = import.meta.env.DEV ? 'http://localhost:5000/api' : '/api';
+const API_URL = import.meta.env.VITE_API_URL
+  || (import.meta.env.DEV ? 'http://localhost:5000/api' : '/api');
 
 const apiClient = axios.create({
   baseURL: API_URL,

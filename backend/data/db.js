@@ -298,6 +298,7 @@ else if (DB_MODE === 'mysql') {
       const sql = fs.readFileSync(schemaPath, 'utf8');
       await pool.query(sql);
       await ensureAppointmentColumns();
+      await hashSeedPasswords();
       console.log('✅  [DB] Đồng bộ schema và seed data thành công!');
     } catch (err) {
       console.error('❌  [DB] Lỗi khi tạo schema:', err.message);
@@ -319,6 +320,24 @@ else if (DB_MODE === 'mysql') {
       const rows = await query('SHOW COLUMNS FROM appointments LIKE ?', [columnName]);
       if (!rows.length) {
         await pool.execute(alterSql);
+      }
+    }
+  }
+
+  // ── HASH mật khẩu seed plaintext (schema.sql INSERT dạng plaintext) ───────
+  async function hashSeedPasswords() {
+    const tables = [
+      { table: 'staff',    idCol: 'id' },
+      { table: 'patients', idCol: 'id' },
+    ];
+    for (const { table, idCol } of tables) {
+      const rows = await query(`SELECT ${idCol}, password FROM ${table} WHERE password NOT LIKE '$2%'`);
+      for (const row of rows) {
+        const hashed = await bcrypt.hash(row.password, saltRounds);
+        await pool.execute(`UPDATE ${table} SET password = ? WHERE ${idCol} = ?`, [hashed, row[idCol]]);
+      }
+      if (rows.length > 0) {
+        console.log(`🔒 [DB] Đã hash ${rows.length} mật khẩu chưa mã hoá trong bảng ${table}.`);
       }
     }
   }
