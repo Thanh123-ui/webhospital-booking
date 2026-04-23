@@ -1,0 +1,27 @@
+{
+  "expo": {
+    "name": "Hospital Patient",
+    "slug": "hospital-patient",
+    "scheme": "hospitalpatient",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "plugins": [
+      "expo-router"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#F5F7F6"
+      }
+    },
+    "web": {
+      "bundler": "metro"
+    }
+  }
+}
