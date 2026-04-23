@@ -1,6 +1,10 @@
 require('dotenv').config();
 
 const requiredVars = ['JWT_SECRET', 'JWT_REFRESH_SECRET'];
+const parseNumber = (value, fallback) => {
+  const parsed = Number.parseInt(String(value ?? ''), 10);
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
 
 for (const name of requiredVars) {
   if (!process.env[name] || !String(process.env[name]).trim()) {
@@ -16,4 +20,10 @@ module.exports = {
     .split(',')
     .map((origin) => origin.trim())
     .filter(Boolean),
+  patientResetOtpLength: parseNumber(process.env.PATIENT_RESET_OTP_LENGTH, 6),
+  patientResetOtpTtlSeconds: parseNumber(process.env.PATIENT_RESET_OTP_TTL_SECONDS, 300),
+  patientResetOtpResendSeconds: parseNumber(process.env.PATIENT_RESET_OTP_RESEND_SECONDS, 60),
+  patientResetOtpPreviewEnabled: String(process.env.PATIENT_RESET_OTP_PREVIEW || 'true').toLowerCase() !== 'false',
+  awsRegion: process.env.AWS_REGION || '',
+  awsSnsSenderId: process.env.AWS_SNS_SENDER_ID || '',
 };

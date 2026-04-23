@@ -5,11 +5,18 @@ const { writeLog } = require('../utils/logger');
 const { jwtSecret, jwtRefreshSecret } = require('../config/env');
 const { AppError, sendSuccess, toAppError } = require('../utils/http');
 
+const OTP_TTL_MS = 5 * 60 * 1000;
+const OTP_RESEND_MS = 60 * 1000;
+const patientPasswordResetStore = new Map();
+
 const generateTokens = (userPayload) => {
     const accessToken = jwt.sign(userPayload, jwtSecret, { expiresIn: '15m' });
     const refreshToken = jwt.sign(userPayload, jwtRefreshSecret, { expiresIn: '7d' });
     return { accessToken, refreshToken };
 };
+
+const normalizePhone = (phone) => String(phone || '').replace(/\s+/g, '').trim();
+const generateOtp = () => String(Math.floor(100000 + Math.random() * 900000));
 
 exports.patientLogin = async (req, res, next) => {
     try {
@@ -27,6 +34,81 @@ exports.patientLogin = async (req, res, next) => {
         }
         
         return next(new AppError('Số điện thoại hoặc mật khẩu không đúng!', 401));
+    } catch (err) {
+        next(toAppError(err));
+    }
+};
+
+exports.requestPatientPasswordResetOtp = async (req, res, next) => {
+    try {
+        const phone = normalizePhone(req.body.phone);
+        const patient = await db.findPatientByPhone(phone);
+
+        if (!patient) {
+            return next(new AppError('Không tìm thấy hồ sơ bệnh nhân với số điện thoại này.', 404));
+        }
+
+        const now = Date.now();
+        const currentEntry = patientPasswordResetStore.get(phone);
+        if (currentEntry && now - currentEntry.requestedAt < OTP_RESEND_MS) {
+            const retryAfter = Math.ceil((OTP_RESEND_MS - (now - currentEntry.requestedAt)) / 1000);
+            return next(new AppError(`Vui lòng chờ ${retryAfter} giây trước khi yêu cầu mã mới.`, 429));
+        }
+
+        const otp = generateOtp();
+        patientPasswordResetStore.set(phone, {
+            otp,
+            patientId: patient.id,
+            requestedAt: now,
+            expiresAt: now + OTP_TTL_MS,
+        });
+
+        writeLog('Yêu cầu OTP quên mật khẩu bệnh nhân', patient.name);
+
+        return sendSuccess(res, {
+            phone,
+            expiresInSeconds: Math.floor(OTP_TTL_MS / 1000),
+            previewOtp: otp,
+        }, 'Mã OTP đã được tạo. Hiện hệ thống đang ở chế độ test nên mã được trả về để bạn kiểm tra.');
+    } catch (err) {
+        next(toAppError(err));
+    }
+};
+
+exports.resetPatientPasswordWithOtp = async (req, res, next) => {
+    try {
+        const phone = normalizePhone(req.body.phone);
+        const otp = String(req.body.otp || '').trim();
+        const newPassword = String(req.body.newPassword || '');
+
+        if (newPassword.trim().length < 6) {
+            return next(new AppError('Mật khẩu mới phải có ít nhất 6 ký tự.', 400));
+        }
+
+        const patient = await db.findPatientByPhone(phone);
+        if (!patient) {
+            return next(new AppError('Không tìm thấy hồ sơ bệnh nhân với số điện thoại này.', 404));
+        }
+
+        const otpEntry = patientPasswordResetStore.get(phone);
+        if (!otpEntry) {
+            return next(new AppError('Mã OTP không tồn tại hoặc đã hết hạn. Vui lòng yêu cầu mã mới.', 400));
+        }
+
+        if (otpEntry.expiresAt < Date.now()) {
+            patientPasswordResetStore.delete(phone);
+            return next(new AppError('Mã OTP đã hết hạn. Vui lòng yêu cầu mã mới.', 400));
+        }
+
+        if (otpEntry.patientId !== patient.id || otpEntry.otp !== otp) {
+            return next(new AppError('Mã OTP không chính xác.', 400));
+        }
+
+        await db.updatePatient(patient.id, { password: newPassword });
+        patientPasswordResetStore.delete(phone);
+        writeLog('Đặt lại mật khẩu bệnh nhân bằng OTP', patient.name);
+
+        return sendSuccess(res, null, 'Đặt lại mật khẩu thành công.');
     } catch (err) {
         next(toAppError(err));
     }

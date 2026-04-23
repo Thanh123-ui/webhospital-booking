@@ -91,6 +91,9 @@ if (DB_MODE === 'mock') {
   async function updatePatient(id, fields) {
     const idx = state.patientsList.findIndex(p => p.id === id);
     if (idx === -1) return null;
+    if (fields.password !== undefined) {
+      fields.password = await bcrypt.hash(fields.password, saltRounds);
+    }
     Object.assign(state.patientsList[idx], fields);
     return state.patientsList[idx];
   }
@@ -565,10 +568,13 @@ else if (DB_MODE === 'mysql') {
   }
 
   async function updatePatient(id, fields) {
-    const allowed = ['cccd', 'dob', 'gender'];
+    const allowed = ['cccd', 'dob', 'gender', 'password'];
     const sets = []; const vals = [];
     for (const [k, v] of Object.entries(fields)) {
-      if (allowed.includes(k) && v !== undefined) { sets.push(`\`${k}\` = ?`); vals.push(v); }
+      if (allowed.includes(k) && v !== undefined) {
+        sets.push(`\`${k}\` = ?`);
+        vals.push(k === 'password' ? await bcrypt.hash(v, saltRounds) : v);
+      }
     }
     if (sets.length) await pool.execute(`UPDATE patients SET ${sets.join(', ')} WHERE id = ?`, [...vals, id]);
     return findPatientById(id);

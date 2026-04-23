@@ -8,18 +8,44 @@ const PatientAuth = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { setCurrentPatient } = useAuth();
-  const [isLogin, setIsLogin] = useState(true);
+  const [authMode, setAuthMode] = useState('login');
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
   const redirectTo = location.state?.from || '/';
 
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [regData, setRegData] = useState({ name: '', phone: '', email: '', password: '', dob: '', address: '' });
+  const [forgotPhone, setForgotPhone] = useState('');
+  const [forgotOtp, setForgotOtp] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [previewOtp, setPreviewOtp] = useState('');
+
+  const isLogin = authMode === 'login';
+  const isRegister = authMode === 'register';
+  const isForgotRequest = authMode === 'forgot-request';
+  const isForgotReset = authMode === 'forgot-reset';
+
+  const switchMode = (nextMode) => {
+    setAuthMode(nextMode);
+    setError('');
+    setSuccess('');
+    if (nextMode !== 'forgot-reset') {
+      setPreviewOtp('');
+      setForgotOtp('');
+      setNewPassword('');
+      setConfirmPassword('');
+    }
+  };
 
   const handleAuth = async (e) => {
     e.preventDefault();
     setError('');
+    setSuccess('');
+    setLoading(true);
 
     try {
       if (isLogin) {
@@ -38,6 +64,60 @@ const PatientAuth = () => {
       }
     } catch (err) {
       setError(err.response?.data?.message || 'Có lỗi xảy ra. Vui lòng thử lại.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleForgotPasswordRequest = async (e) => {
+    e.preventDefault();
+    setError('');
+    setSuccess('');
+    setLoading(true);
+
+    try {
+      const res = await api.requestPatientPasswordResetOtp(forgotPhone);
+      setPreviewOtp(res.data.previewOtp || '');
+      setSuccess(res.data.message || 'Mã OTP đã được tạo thành công.');
+      setAuthMode('forgot-reset');
+    } catch (err) {
+      setError(err.response?.data?.message || 'Không thể tạo mã OTP lúc này.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResetPassword = async (e) => {
+    e.preventDefault();
+    setError('');
+    setSuccess('');
+
+    if (newPassword.length < 6) {
+      setError('Mật khẩu mới phải có ít nhất 6 ký tự.');
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setError('Mật khẩu xác nhận không khớp.');
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const res = await api.resetPatientPasswordWithOtp(forgotPhone, forgotOtp, newPassword);
+      setSuccess(res.data.message || 'Đặt lại mật khẩu thành công. Bạn có thể đăng nhập lại.');
+      setPassword('');
+      setPhone(forgotPhone);
+      setForgotOtp('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setPreviewOtp('');
+      setAuthMode('login');
+    } catch (err) {
+      setError(err.response?.data?.message || 'Không thể đặt lại mật khẩu.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -52,12 +132,16 @@ const PatientAuth = () => {
             <Stethoscope size={24} className="text-primary" />
           </div>
           <h1 className="font-headline text-3xl font-bold tracking-tight text-on-surface">
-            {isLogin ? 'Chào mừng trở lại' : 'Tạo hồ sơ bệnh nhân'}
+            {isLogin ? 'Chào mừng trở lại' : isRegister ? 'Tạo hồ sơ bệnh nhân' : isForgotRequest ? 'Khôi phục mật khẩu' : 'Xác nhận mã OTP'}
           </h1>
           <p className="text-sm leading-relaxed text-on-surface-variant">
             {isLogin
-              ? 'Đăng nhập để tiếp tục hành trình chăm sóc sức khỏe của bạn tại Hospital.'
-              : 'Đăng ký hồ sơ để đặt lịch khám, theo dõi lịch hẹn và quản lý thông tin y tế dễ dàng hơn.'}
+              ? 'Đăng nhập để tiếp tục hành trình chăm sóc sức khỏe của bạn tại bệnh viện.'
+              : isRegister
+                ? 'Đăng ký hồ sơ để đặt lịch khám, theo dõi lịch hẹn và quản lý thông tin y tế dễ dàng hơn.'
+                : isForgotRequest
+                  ? 'Nhập số điện thoại đã đăng ký để nhận mã OTP thử nghiệm và đặt lại mật khẩu.'
+                  : 'Nhập mã OTP cùng mật khẩu mới để hoàn tất việc khôi phục tài khoản bệnh nhân.'}
           </p>
         </header>
 
@@ -67,8 +151,20 @@ const PatientAuth = () => {
           </div>
         ) : null}
 
-        <form onSubmit={handleAuth} className="flex flex-col gap-6">
-          {!isLogin ? (
+        {success ? (
+          <div className="mb-6 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+            {success}
+          </div>
+        ) : null}
+
+        {previewOtp && isForgotReset ? (
+          <div className="mb-6 rounded-2xl border border-primary/15 bg-primary-container/40 px-4 py-3 text-sm text-on-primary-container">
+            Mã OTP test hiện tại: <span className="font-bold tracking-[0.3em]">{previewOtp}</span>
+          </div>
+        ) : null}
+
+        <form onSubmit={isForgotRequest ? handleForgotPasswordRequest : isForgotReset ? handleResetPassword : handleAuth} className="flex flex-col gap-6">
+          {isRegister ? (
             <>
               <div className="group">
                 <label className="mb-1 block px-3 text-xs font-semibold uppercase tracking-wider text-on-surface-variant">
@@ -108,7 +204,7 @@ const PatientAuth = () => {
 
           <div className="group">
             <label className="mb-1 block px-3 text-xs font-semibold uppercase tracking-wider text-on-surface-variant">
-              Số điện thoại
+              {isForgotReset ? 'Số điện thoại đã xác nhận' : 'Số điện thoại'}
             </label>
             <div className="relative">
               <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-outline-variant transition-colors group-focus-within:text-primary" size={18} />
@@ -116,23 +212,51 @@ const PatientAuth = () => {
                 required
                 type="tel"
                 className="w-full rounded-t-xl border-0 border-b border-outline-variant/20 bg-surface-container-low py-3 pl-10 pr-3 text-on-surface outline-none transition-all focus:border-b-2 focus:border-primary focus:bg-surface-container-lowest"
-                value={isLogin ? phone : regData.phone}
-                onChange={(e) => (isLogin ? setPhone(e.target.value) : setRegData({ ...regData, phone: e.target.value }))}
+                value={isLogin ? phone : isRegister ? regData.phone : forgotPhone}
+                onChange={(e) => {
+                  if (isLogin) setPhone(e.target.value);
+                  else if (isRegister) setRegData({ ...regData, phone: e.target.value });
+                  else setForgotPhone(e.target.value);
+                }}
                 placeholder="Nhập số điện thoại"
+                disabled={isForgotReset}
               />
             </div>
           </div>
 
+          {isForgotReset ? (
+            <div className="group">
+              <label className="mb-1 block px-3 text-xs font-semibold uppercase tracking-wider text-on-surface-variant">
+                Mã OTP
+              </label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-outline-variant transition-colors group-focus-within:text-primary" size={18} />
+                <input
+                  required
+                  type="text"
+                  className="w-full rounded-t-xl border-0 border-b border-outline-variant/20 bg-surface-container-low py-3 pl-10 pr-3 text-on-surface outline-none transition-all focus:border-b-2 focus:border-primary focus:bg-surface-container-lowest"
+                  value={forgotOtp}
+                  onChange={(e) => setForgotOtp(e.target.value)}
+                  placeholder="Nhập mã OTP gồm 6 số"
+                />
+              </div>
+            </div>
+          ) : null}
+
+          {!isForgotRequest ? (
           <div className="group">
             <div className="mb-1 flex items-end justify-between px-3">
               <label className="text-xs font-semibold uppercase tracking-wider text-on-surface-variant">
-                Mật khẩu
+                {isForgotReset ? 'Mật khẩu mới' : 'Mật khẩu'}
               </label>
               {isLogin ? (
                 <button
                   type="button"
                   className="text-xs font-medium text-primary hover:text-primary-dim"
-                  onClick={() => setError('Vui lòng liên hệ bệnh viện để được hỗ trợ cấp lại mật khẩu.')}
+                  onClick={() => {
+                    setForgotPhone(phone);
+                    switchMode('forgot-request');
+                  }}
                 >
                   Quên mật khẩu?
                 </button>
@@ -144,8 +268,12 @@ const PatientAuth = () => {
                 required
                 type={showPassword ? 'text' : 'password'}
                 className="w-full rounded-t-xl border-0 border-b border-outline-variant/20 bg-surface-container-low py-3 pl-10 pr-10 text-on-surface outline-none transition-all focus:border-b-2 focus:border-primary focus:bg-surface-container-lowest"
-                value={isLogin ? password : regData.password}
-                onChange={(e) => (isLogin ? setPassword(e.target.value) : setRegData({ ...regData, password: e.target.value }))}
+                value={isLogin ? password : isRegister ? regData.password : newPassword}
+                onChange={(e) => {
+                  if (isLogin) setPassword(e.target.value);
+                  else if (isRegister) setRegData({ ...regData, password: e.target.value });
+                  else setNewPassword(e.target.value);
+                }}
                 placeholder="••••••••"
               />
               <button
@@ -157,13 +285,42 @@ const PatientAuth = () => {
               </button>
             </div>
           </div>
+          ) : null}
+
+          {isForgotReset ? (
+            <div className="group">
+              <label className="mb-1 block px-3 text-xs font-semibold uppercase tracking-wider text-on-surface-variant">
+                Xác nhận mật khẩu mới
+              </label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-outline-variant transition-colors group-focus-within:text-primary" size={18} />
+                <input
+                  required
+                  type={showPassword ? 'text' : 'password'}
+                  className="w-full rounded-t-xl border-0 border-b border-outline-variant/20 bg-surface-container-low py-3 pl-10 pr-10 text-on-surface outline-none transition-all focus:border-b-2 focus:border-primary focus:bg-surface-container-lowest"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Nhập lại mật khẩu mới"
+                />
+              </div>
+            </div>
+          ) : null}
 
           <div className="mt-2 flex flex-col gap-4">
             <button
               type="submit"
+              disabled={loading}
               className="flex w-full items-center justify-center gap-2 rounded-3xl bg-gradient-to-r from-primary to-primary-dim px-6 py-4 font-headline text-base font-semibold text-on-primary shadow-[0_4px_20px_-10px_rgba(36,104,107,0.4)] transition-all hover:brightness-110 hover:shadow-[0_8px_25px_-10px_rgba(36,104,107,0.6)]"
             >
-              {isLogin ? 'Đăng nhập' : 'Hoàn tất đăng ký'}
+              {loading
+                ? 'Đang xử lý...'
+                : isLogin
+                  ? 'Đăng nhập'
+                  : isRegister
+                    ? 'Hoàn tất đăng ký'
+                    : isForgotRequest
+                      ? 'Gửi mã OTP'
+                      : 'Đặt lại mật khẩu'}
               <ArrowRight size={16} />
             </button>
 
@@ -176,18 +333,32 @@ const PatientAuth = () => {
             </div>
 
             <div className="text-center text-sm text-on-surface-variant">
-              {isLogin ? 'Chưa có hồ sơ tại Hospital?' : 'Đã có tài khoản?'}
+              {isLogin
+                ? 'Chưa có hồ sơ bệnh nhân?'
+                : isRegister
+                  ? 'Đã có tài khoản?'
+                  : 'Đã nhớ lại mật khẩu?'}
               <button
                 type="button"
                 onClick={() => {
-                  setIsLogin(!isLogin);
-                  setError('');
+                  if (isLogin) switchMode('register');
+                  else switchMode('login');
                 }}
                 className="ml-1 font-semibold text-primary underline-offset-4 hover:underline"
               >
                 {isLogin ? 'Đăng ký tài khoản mới' : 'Đăng nhập ngay'}
               </button>
             </div>
+
+            {isForgotReset ? (
+              <button
+                type="button"
+                onClick={() => switchMode('forgot-request')}
+                className="text-center text-sm font-medium text-primary hover:text-primary-dim"
+              >
+                Gửi lại mã OTP khác
+              </button>
+            ) : null}
           </div>
         </form>
       </main>

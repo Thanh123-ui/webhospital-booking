@@ -176,6 +176,8 @@ export const api = {
   getSystemLogs: () => apiClient.get('/data/logs', { headers: getAuthHeader('staff') }),
 
   loginPatient: (phone, password) => apiClient.post('/auth/patient/login', { phone, password }),
+  requestPatientPasswordResetOtp: (phone) => apiClient.post('/auth/patient/forgot-password/request-otp', { phone }),
+  resetPatientPasswordWithOtp: (phone, otp, newPassword) => apiClient.post('/auth/patient/forgot-password/reset', { phone, otp, newPassword }),
   loginStaff: (username, password) => apiClient.post('/auth/staff/login', { username, password }),
 
   getAllAppointments: (role, deptId, authType = 'staff') => apiClient.get('/appointments', {
