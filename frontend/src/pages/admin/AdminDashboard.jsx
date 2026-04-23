@@ -117,9 +117,6 @@ const AdminDashboard = () => {
   const fetchPatients = () => api.getAllPatients(currentStaffUser.role, currentStaffUser.deptId).then(res => setPatients(res.data)).catch((err) => {
     setDashboardError(getErrorMessage(err, 'Không tải được danh sách bệnh nhân.'));
   });
-  const fetchStaff = () => api.getAllStaff().then(res => setStaffList(res.data)).catch((err) => {
-    setDashboardError(getErrorMessage(err, 'Không tải được danh sách nhân sự.'));
-  });
   const currentDept = departments.find(d => d.id === currentStaffUser?.deptId);
   const isEmergencyDept = currentDept?.isEmergency;
   const canAccessEmergencyAlerts = role === 'RECEPTIONIST' || (['DOCTOR', 'NURSE'].includes(role) && isEmergencyDept);
@@ -286,10 +283,11 @@ const AdminDashboard = () => {
     e.preventDefault();
     if (!newStaff.password || newStaff.password.length < 3) { alert('Mật khẩu phải có ít nhất 3 ký tự!'); return; }
     try {
-      await api.addStaff(newStaff);
+      const res = await api.addStaff(newStaff);
+      const { success: _SUCCESS, message: _MESSAGE, ...createdStaff } = res.data;
       showToast('✅ Tạo tài khoản thành công!');
       setNewStaff({ name: '', username: '', password: '', role: 'DOCTOR', title: '', deptId: '', exp: '' });
-      fetchStaff();
+      setStaffList((prev) => [createdStaff, ...prev]);
     } catch (err) { alert(err.response?.data?.message || 'Lỗi khi thêm nhân sự'); }
   };
 
@@ -307,16 +305,18 @@ const AdminDashboard = () => {
 
   const handleToggleStaff = async (id) => {
     try {
-      await api.toggleStaffActive(id);
-      fetchStaff();
+      const res = await api.toggleStaffActive(id);
+      const { success: _SUCCESS, message: _MESSAGE, ...updatedStaff } = res.data;
+      setStaffList((prev) => prev.map((staff) => (staff.id === id ? { ...staff, ...updatedStaff } : staff)));
     } catch (err) { alert(err.response?.data?.message || 'Lỗi khi thay đổi trạng thái!'); }
   };
 
   const handleChangeRole = async (id, newRole) => {
     if (!window.confirm(`Đổi vai trò sang "${newRole}"?`)) return;
     try {
-      await api.updateStaffRole(id, newRole);
-      fetchStaff();
+      const res = await api.updateStaffRole(id, newRole);
+      const { success: _SUCCESS, message: _MESSAGE, ...updatedStaff } = res.data;
+      setStaffList((prev) => prev.map((staff) => (staff.id === id ? { ...staff, ...updatedStaff } : staff)));
       showToast('✅ Đã cập nhật vai trò!');
     } catch (err) { alert(err.response?.data?.message || 'Lỗi khi đổi quyền!'); }
   };

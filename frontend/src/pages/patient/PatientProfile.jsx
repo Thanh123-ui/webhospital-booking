@@ -19,7 +19,7 @@ const PatientProfile = () => {
   const [profileData, setProfileData] = useState({ cccd: '', dob: '', gender: '' });
 
   const handleOpenEdit = () => {
-    setProfileData({ cccd: currentPatient.cccd || '', dob: currentPatient.dob || '', gender: currentPatient.gender || '' });
+    setProfileData({ cccd: currentPatient.cccd || '', dob: normalizeDateValue(currentPatient.dob) || '', gender: currentPatient.gender || '' });
     setEditProfileModal(true);
   };
 
@@ -147,7 +147,7 @@ const PatientProfile = () => {
             <p className="text-center text-slate-500 text-sm mb-6 pb-6 border-b">{currentPatient.phone}</p>
             
             <div className="space-y-4 text-sm mb-6">
-              <div className="flex justify-between items-center"><span className="text-slate-500">Ngày sinh:</span> <span className="font-semibold text-slate-700">{currentPatient.dob || '---'}</span></div>
+              <div className="flex justify-between items-center"><span className="text-slate-500">Ngày sinh:</span> <span className="font-semibold text-slate-700">{formatDateDisplay(currentPatient.dob)}</span></div>
               <div className="flex justify-between items-center"><span className="text-slate-500">Giới tính:</span> <span className="font-semibold text-slate-700">{currentPatient.gender || '---'}</span></div>
               <div className="flex justify-between items-center"><span className="text-slate-500">CCCD:</span> <span className="font-semibold text-slate-700">{currentPatient.cccd || '---'}</span></div>
               <div className="flex justify-between items-center"><span className="text-slate-500">Email:</span> <span className="font-semibold text-slate-700 break-all">{currentPatient.email || '---'}</span></div>

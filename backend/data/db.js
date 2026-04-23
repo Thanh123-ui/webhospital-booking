@@ -597,27 +597,24 @@ else if (DB_MODE === 'mysql') {
 
   async function addStaff(staff) {
     const hashedPassword = await bcrypt.hash(staff.password, saltRounds);
-    const sql = `INSERT INTO staff (deptId, name, title, avatar, role, isActive, username, password, permissions)
-      VALUES (?,?,?,?,?,?,?,?,?)`;
+    const sql = `INSERT INTO staff (deptId, name, title, avatar, role, isActive, username, password)
+      VALUES (?,?,?,?,?,?,?,?)`;
     const [result] = await pool.execute(sql, [
       staff.deptId || null, staff.name, staff.title || '', staff.avatar || '👤',
-      staff.role, staff.isActive ? 1 : 0, staff.username, hashedPassword, JSON.stringify(staff.permissions || [])
+      staff.role, staff.isActive ? 1 : 0, staff.username, hashedPassword
     ]);
     staff.id = result.insertId;
     return staff;
   }
 
   async function updateStaffField(id, fields) {
-    const allowed = ['role', 'isActive', 'password', 'deptId', 'name', 'title', 'permissions'];
+    const allowed = ['role', 'isActive', 'password', 'deptId', 'name', 'title'];
     const sets = []; const vals = [];
     for (const [k, v] of Object.entries(fields)) {
       if (allowed.includes(k)) {
         if (k === 'password') {
           sets.push(`\`${k}\` = ?`);
           vals.push(await bcrypt.hash(v, saltRounds));
-        } else if (k === 'permissions') {
-          sets.push(`\`${k}\` = ?`);
-          vals.push(JSON.stringify(v));
         } else {
           sets.push(`\`${k}\` = ?`);
           vals.push(v);
