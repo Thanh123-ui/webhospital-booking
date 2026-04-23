@@ -4,6 +4,8 @@ dist/
 .gemini/
 system-logs.log
 .vscode/
+mobile/.expo/
+mobile/.env
 ._*
 **/._*
 ._system-logs.log
