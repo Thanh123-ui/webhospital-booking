@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { Lock, User, Phone, Mail, ArrowRight, Stethoscope, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../../services/AuthContext';
 import { api } from '../../services/api';
+import { toApiDateValue } from '../../utils/helpers';
 
 const PatientAuth = () => {
   const navigate = useNavigate();
@@ -55,7 +56,10 @@ const PatientAuth = () => {
         setCurrentPatient(res.data.user);
         navigate(redirectTo, { replace: true });
       } else {
-        await api.registerPatient(regData);
+        await api.registerPatient({
+          ...regData,
+          dob: toApiDateValue(regData.dob),
+        });
         const loginRes = await api.loginPatient(regData.phone, regData.password);
         localStorage.setItem('patientAccessToken', loginRes.data.accessToken);
         localStorage.setItem('patientRefreshToken', loginRes.data.refreshToken);

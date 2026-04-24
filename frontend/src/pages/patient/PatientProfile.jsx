@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../services/AuthContext';
 import { User, Calendar, FileText, Activity, Clock, Printer, Star } from 'lucide-react';
 import { api } from '../../services/api';
-import { formatDateDisplay, getStatusBadge, normalizeDateValue } from '../../utils/helpers';
+import { formatDateDisplay, getStatusBadge, normalizeDateValue, maskDisplayDateInput, toApiDateValue, toDisplayDateValue } from '../../utils/helpers';
 
 const PatientProfile = () => {
   const { currentPatient, setCurrentPatient } = useAuth();
@@ -19,14 +19,17 @@ const PatientProfile = () => {
   const [profileData, setProfileData] = useState({ cccd: '', dob: '', gender: '' });
 
   const handleOpenEdit = () => {
-    setProfileData({ cccd: currentPatient.cccd || '', dob: normalizeDateValue(currentPatient.dob) || '', gender: currentPatient.gender || '' });
+    setProfileData({ cccd: currentPatient.cccd || '', dob: toDisplayDateValue(currentPatient.dob), gender: currentPatient.gender || '' });
     setEditProfileModal(true);
   };
 
   const handleUpdateProfile = async (e) => {
     e.preventDefault();
     try {
-       const res = await api.updatePatientProfile(currentPatient.id, profileData, 'patient');
+       const res = await api.updatePatientProfile(currentPatient.id, {
+         ...profileData,
+         dob: toApiDateValue(profileData.dob),
+       }, 'patient');
        setCurrentPatient(res.data.user);
        setEditProfileModal(false);
     } catch {
@@ -329,8 +332,8 @@ const PatientProfile = () => {
                     </select>
                  </div>
                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">Ngày sinh <span className="text-red-500">*</span></label>
-                    <input required type="date" className="w-full p-2.5 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500" value={profileData.dob} onChange={e=>setProfileData({...profileData, dob: e.target.value})} />
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Ngày sinh (DD-MM-YYYY) <span className="text-red-500">*</span></label>
+                    <input required type="text" inputMode="numeric" maxLength={10} placeholder="dd-mm-yyyy" className="w-full p-2.5 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500" value={profileData.dob} onChange={e=>setProfileData({...profileData, dob: maskDisplayDateInput(e.target.value)})} />
                  </div>
               </div>
               <div className="flex gap-3">

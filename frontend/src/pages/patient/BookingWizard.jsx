@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { CalendarCheck, Check, Activity, Award, ArrowRight, ChevronRight, User, Clock, FileText, AlertCircle } from 'lucide-react';
 import { api } from '../../services/api';
 import { useAuth } from '../../services/AuthContext';
+import { maskDisplayDateInput, toApiDateValue, toDisplayDateValue } from '../../utils/helpers';
 
 const DEPT_TONES = {
   'Tim mạch': 'from-rose-100 via-white to-red-100 text-rose-700 border-rose-200',
@@ -29,7 +30,7 @@ const buildInitialBookingData = (currentPatient, searchParams) => ({
   name: currentPatient?.name || '',
   phone: currentPatient?.phone || '',
   email: currentPatient?.email || '',
-  dob: currentPatient?.dob || '',
+  dob: toDisplayDateValue(currentPatient?.dob),
   cccd: currentPatient?.cccd || '',
   gender: (currentPatient?.gender && currentPatient.gender !== 'Unknown') ? currentPatient.gender : '',
   symptoms: '',
@@ -126,7 +127,7 @@ const BookingWizard = () => {
         name: currentPatient.name, 
         phone: currentPatient.phone, 
         email: currentPatient.email || '', 
-        dob: currentPatient.dob || '',
+        dob: toDisplayDateValue(currentPatient.dob),
         cccd: currentPatient.cccd || '',
         gender: (currentPatient.gender && currentPatient.gender !== 'Unknown') ? currentPatient.gender : ''
       }));
@@ -169,13 +170,13 @@ const BookingWizard = () => {
       if (currentPatient) {
         const hasProfileChanges =
           bookingData.cccd !== (currentPatient.cccd || '') ||
-          bookingData.dob !== (currentPatient.dob || '') ||
+          bookingData.dob !== toDisplayDateValue(currentPatient.dob) ||
           bookingData.gender !== ((currentPatient.gender && currentPatient.gender !== 'Unknown') ? currentPatient.gender : '');
 
         if (hasProfileChanges) {
           const profileRes = await api.updatePatientProfile(currentPatient.id, {
             cccd: bookingData.cccd,
-            dob: bookingData.dob,
+            dob: toApiDateValue(bookingData.dob),
             gender: bookingData.gender,
           });
           setCurrentPatient(profileRes.data.user);
@@ -186,7 +187,7 @@ const BookingWizard = () => {
         name: bookingData.name, 
         phone: bookingData.phone, 
         cccd: bookingData.cccd,
-        dob: bookingData.dob,
+        dob: toApiDateValue(bookingData.dob),
         gender: bookingData.gender,
         doctorId: bookingData.doctorId, 
         deptId: bookingData.dept,
@@ -388,9 +389,9 @@ const BookingWizard = () => {
                       </select>
                     </div>
                     <div>
-                      <label className="block text-sm font-bold text-slate-700 mb-1">Ngày sinh <span className="text-red-500">*</span></label>
-                      <input required type="date" className={`w-full p-3 border rounded-xl outline-none transition-all ${currentPatient && currentPatient.dob ? 'bg-slate-100 text-slate-500 border-slate-200' : 'bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500'}`}
-                        value={bookingData.dob} onChange={e => setBookingData({...bookingData, dob: e.target.value})} readOnly={!!(currentPatient && currentPatient.dob)} />
+                      <label className="block text-sm font-bold text-slate-700 mb-1">Ngày sinh (DD-MM-YYYY) <span className="text-red-500">*</span></label>
+                      <input required type="text" inputMode="numeric" maxLength={10} placeholder="dd-mm-yyyy" className={`w-full p-3 border rounded-xl outline-none transition-all ${currentPatient && currentPatient.dob ? 'bg-slate-100 text-slate-500 border-slate-200' : 'bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500'}`}
+                        value={bookingData.dob} onChange={e => setBookingData({...bookingData, dob: maskDisplayDateInput(e.target.value)})} readOnly={!!(currentPatient && currentPatient.dob)} />
                     </div>
                     <div className="md:col-span-2">
                       <label className="block text-sm font-bold text-slate-700 mb-1">Triệu chứng / Ghi chú cho bác sĩ</label>

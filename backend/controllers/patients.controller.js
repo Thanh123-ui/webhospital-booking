@@ -18,6 +18,29 @@ const DOCTOR_VISIBLE_STATUSES = new Set([
     'CANCELED',
 ]);
 
+function normalizeIncomingDob(dob) {
+    if (!dob) return '';
+
+    const raw = String(dob).trim();
+    if (!raw) return '';
+
+    const displayMatch = raw.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+    if (displayMatch) {
+        return `${displayMatch[3]}-${displayMatch[2]}-${displayMatch[1]}`;
+    }
+
+    const isoMatch = raw.match(/^(\d{4}-\d{2}-\d{2})/);
+    if (isoMatch) return isoMatch[1];
+
+    const parsed = new Date(raw);
+    if (Number.isNaN(parsed.getTime())) return raw;
+
+    const year = parsed.getFullYear();
+    const month = String(parsed.getMonth() + 1).padStart(2, '0');
+    const day = String(parsed.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
 function getEffectiveDeptId(appt, staffList) {
     if (appt.current_department) return parseInt(appt.current_department);
     if (appt.deptId) return parseInt(appt.deptId);
@@ -100,7 +123,7 @@ exports.registerPatient = async (req, res, next) => {
             email: data.email,
             password: data.password,
             gender: data.gender || 'Unknown',
-            dob: data.dob || '',
+            dob: normalizeIncomingDob(data.dob),
             address: data.address || '',
             medicalHistory: []
         };
@@ -142,7 +165,7 @@ exports.updatePatient = async (req, res, next) => {
             return next(new AppError('Bạn không có quyền cập nhật hồ sơ của bệnh nhân khác.', 403));
         }
 
-        const updated = await db.updatePatient(parseInt(id), { cccd, dob, gender });
+        const updated = await db.updatePatient(parseInt(id), { cccd, dob: normalizeIncomingDob(dob), gender });
         if (!updated) {
             return next(new AppError('Không tìm thấy bệnh nhân', 404));
         }
