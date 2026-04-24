@@ -20,10 +20,31 @@ export default function LoginScreen() {
 
     try {
       const res = await mobileApi.loginPatient(phone, password);
-      await signIn(res.data.user, res.data.accessToken, res.data.refreshToken);
-      router.replace('/home');
+      const user = res?.data?.user;
+      const accessToken = res?.data?.accessToken;
+      const refreshToken = res?.data?.refreshToken;
+
+      if (!user || !accessToken || !refreshToken) {
+        throw new Error('Phản hồi đăng nhập không hợp lệ.');
+      }
+
+      try {
+        await signIn(user, accessToken, refreshToken);
+      } catch (storageError: any) {
+        throw new Error(storageError?.message || 'Không thể lưu phiên đăng nhập.');
+      }
+
+      try {
+        router.replace('/home');
+      } catch (navigationError: any) {
+        throw new Error(navigationError?.message || 'Không thể chuyển sang trang chủ.');
+      }
     } catch (err: any) {
-      setError(err?.response?.data?.message || 'Không thể đăng nhập lúc này.');
+      setError(
+        err?.response?.data?.message
+        || err?.message
+        || 'Không thể đăng nhập lúc này.',
+      );
     } finally {
       setLoading(false);
     }

@@ -7,7 +7,7 @@ import { useAuth } from '@/context/AuthContext';
 import { mobileApi } from '@/services/api';
 import { colors, radii, spacing } from '@/theme';
 import type { Department, Doctor, Schedule } from '@/types';
-import { formatDateDisplay, getDoctorInitials, normalizeDateValue, toLocalDateInputValue } from '@/utils/date';
+import { formatDateDisplay, getDoctorInitials, maskDisplayDateInput, normalizeDateValue, toApiDateValue, toDisplayDateValue, toLocalDateInputValue } from '@/utils/date';
 
 type BookingForm = {
   dept: string;
@@ -37,7 +37,7 @@ export default function BookingScreen() {
     date: '',
     time: '',
     cccd: patient?.cccd || '',
-    dob: normalizeDateValue(patient?.dob) || '',
+    dob: toDisplayDateValue(patient?.dob) || '',
     gender: patient?.gender && patient.gender !== 'Unknown' ? patient.gender : '',
     symptoms: '',
   });
@@ -47,7 +47,7 @@ export default function BookingScreen() {
     setForm((prev) => ({
       ...prev,
       cccd: patient.cccd || '',
-      dob: normalizeDateValue(patient.dob) || '',
+      dob: toDisplayDateValue(patient.dob) || '',
       gender: patient.gender && patient.gender !== 'Unknown' ? patient.gender : '',
     }));
   }, [patient?.cccd, patient?.dob, patient?.gender]);
@@ -110,13 +110,13 @@ export default function BookingScreen() {
     try {
       const profileChanged =
         form.cccd !== (patient.cccd || '') ||
-        form.dob !== (normalizeDateValue(patient.dob) || '') ||
+        form.dob !== (toDisplayDateValue(patient.dob) || '') ||
         form.gender !== ((patient.gender && patient.gender !== 'Unknown') ? patient.gender : '');
 
       if (profileChanged) {
         const profileRes = await mobileApi.updatePatientProfile(patient.id, {
           cccd: form.cccd,
-          dob: form.dob,
+          dob: toApiDateValue(form.dob),
           gender: form.gender,
         });
         await updatePatient(profileRes.data.user);
@@ -124,12 +124,13 @@ export default function BookingScreen() {
 
       const res = await mobileApi.createAppointment({
         patientId: patient.id,
+        phone: patient.phone,
         doctorId: Number(form.doctorId),
         deptId: Number(form.dept),
         date: form.date,
         time: form.time,
         cccd: form.cccd,
-        dob: form.dob,
+        dob: toApiDateValue(form.dob),
         gender: form.gender,
         symptoms: form.symptoms,
       });
@@ -239,7 +240,14 @@ export default function BookingScreen() {
             <FieldGroup label="Bệnh nhân" value={patient?.name || '---'} />
             <FieldGroup label="Số điện thoại" value={patient?.phone || '---'} />
             <FieldInput label="CCCD" value={form.cccd} onChangeText={(value) => patchForm({ cccd: value })} />
-            <FieldInput label="Ngày sinh (yyyy-mm-dd)" value={form.dob} onChangeText={(value) => patchForm({ dob: value })} />
+            <FieldInput
+              label="Ngày sinh (DD-MM-YYYY)"
+              value={form.dob}
+              keyboardType="number-pad"
+              placeholder="dd-mm-yyyy"
+              maxLength={10}
+              onChangeText={(value) => patchForm({ dob: maskDisplayDateInput(value) })}
+            />
             <FieldInput label="Giới tính" value={form.gender} onChangeText={(value) => patchForm({ gender: value })} />
 
             <Text style={styles.label}>Triệu chứng</Text>
@@ -296,11 +304,12 @@ const FieldInput = ({
   label,
   value,
   onChangeText,
+  ...props
 }: {
   label: string;
   value: string;
   onChangeText: (value: string) => void;
-}) => (
+} & Omit<React.ComponentProps<typeof TextInput>, 'value' | 'onChangeText'>) => (
   <View style={{ gap: 6 }}>
     <Text style={styles.label}>{label}</Text>
     <TextInput
@@ -308,6 +317,7 @@ const FieldInput = ({
       onChangeText={onChangeText}
       style={styles.input}
       placeholderTextColor={colors.textMuted}
+      {...props}
     />
   </View>
 );

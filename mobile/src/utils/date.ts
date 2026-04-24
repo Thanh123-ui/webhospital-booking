@@ -7,6 +7,9 @@ export const normalizeDateValue = (dateValue?: string | null) => {
   const isoMatch = raw.match(/^(\d{4}-\d{2}-\d{2})/);
   if (isoMatch) return isoMatch[1];
 
+  const displayMatch = raw.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+  if (displayMatch) return `${displayMatch[3]}-${displayMatch[2]}-${displayMatch[1]}`;
+
   const parsed = new Date(raw);
   if (Number.isNaN(parsed.getTime())) return raw;
 
@@ -14,6 +17,33 @@ export const normalizeDateValue = (dateValue?: string | null) => {
   const month = String(parsed.getMonth() + 1).padStart(2, '0');
   const day = String(parsed.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
+};
+
+export const toDisplayDateValue = (dateValue?: string | null) => {
+  const normalizedDate = normalizeDateValue(dateValue);
+  if (!normalizedDate) return '';
+
+  const [year, month, day] = normalizedDate.split('-');
+  if (!year || !month || !day) return '';
+  return `${day}-${month}-${year}`;
+};
+
+export const toApiDateValue = (dateValue?: string | null) => {
+  const raw = String(dateValue || '').trim();
+  if (!raw) return '';
+
+  const displayMatch = raw.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+  if (displayMatch) return `${displayMatch[3]}-${displayMatch[2]}-${displayMatch[1]}`;
+
+  return normalizeDateValue(raw);
+};
+
+export const maskDisplayDateInput = (value: string) => {
+  const digits = String(value || '').replace(/\D/g, '').slice(0, 8);
+
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 4) return `${digits.slice(0, 2)}-${digits.slice(2)}`;
+  return `${digits.slice(0, 2)}-${digits.slice(2, 4)}-${digits.slice(4)}`;
 };
 
 export const formatDateDisplay = (

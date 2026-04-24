@@ -6,7 +6,7 @@ import { useAuth } from '@/context/AuthContext';
 import { mobileApi } from '@/services/api';
 import { colors, radii, spacing } from '@/theme';
 import type { Appointment, MedicalHistoryItem, Patient } from '@/types';
-import { canCancelAppointment, formatDateDisplay, normalizeDateValue } from '@/utils/date';
+import { canCancelAppointment, formatDateDisplay, maskDisplayDateInput, toApiDateValue, toDisplayDateValue } from '@/utils/date';
 
 export default function ProfileScreen() {
   const { patient, updatePatient, signOut } = useAuth();
@@ -52,7 +52,7 @@ export default function ProfileScreen() {
     if (!currentPatient) return;
     setProfileData({
       cccd: currentPatient.cccd || '',
-      dob: normalizeDateValue(currentPatient.dob) || '',
+      dob: toDisplayDateValue(currentPatient.dob) || '',
       gender: currentPatient.gender || '',
     });
     setEditing(true);
@@ -62,7 +62,11 @@ export default function ProfileScreen() {
     if (!currentPatient) return;
 
     try {
-      const res = await mobileApi.updatePatientProfile(currentPatient.id, profileData);
+      const payload = {
+        ...profileData,
+        dob: toApiDateValue(profileData.dob),
+      };
+      const res = await mobileApi.updatePatientProfile(currentPatient.id, payload);
       await updatePatient(res.data.user);
       setEditing(false);
     } catch (err: any) {
@@ -177,7 +181,14 @@ export default function ProfileScreen() {
           <Card style={{ width: '100%' }}>
             <SectionTitle title="Cập nhật hồ sơ" />
             <Field label="CCCD" value={profileData.cccd} onChangeText={(value) => setProfileData((prev) => ({ ...prev, cccd: value }))} />
-            <Field label="Ngày sinh (yyyy-mm-dd)" value={profileData.dob} onChangeText={(value) => setProfileData((prev) => ({ ...prev, dob: value }))} />
+            <Field
+              label="Ngày sinh (DD-MM-YYYY)"
+              value={profileData.dob}
+              keyboardType="number-pad"
+              placeholder="dd-mm-yyyy"
+              maxLength={10}
+              onChangeText={(value) => setProfileData((prev) => ({ ...prev, dob: maskDisplayDateInput(value) }))}
+            />
             <Field label="Giới tính" value={profileData.gender} onChangeText={(value) => setProfileData((prev) => ({ ...prev, gender: value }))} />
             <View style={{ gap: spacing.sm }}>
               <PrimaryButton label="Lưu thay đổi" onPress={handleUpdateProfile} />

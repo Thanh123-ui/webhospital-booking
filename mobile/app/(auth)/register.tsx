@@ -6,6 +6,7 @@ import { Field, InfoBanner, PrimaryButton, Screen } from '@/components/ui';
 import { useAuth } from '@/context/AuthContext';
 import { mobileApi } from '@/services/api';
 import { colors } from '@/theme';
+import { maskDisplayDateInput, toApiDateValue } from '@/utils/date';
 
 export default function RegisterScreen() {
   const { signIn } = useAuth();
@@ -29,12 +30,36 @@ export default function RegisterScreen() {
     setLoading(true);
 
     try {
-      await mobileApi.registerPatient(form);
+      await mobileApi.registerPatient({
+        ...form,
+        dob: toApiDateValue(form.dob),
+      });
       const loginRes = await mobileApi.loginPatient(form.phone, form.password);
-      await signIn(loginRes.data.user, loginRes.data.accessToken, loginRes.data.refreshToken);
-      router.replace('/home');
+      const user = loginRes?.data?.user;
+      const accessToken = loginRes?.data?.accessToken;
+      const refreshToken = loginRes?.data?.refreshToken;
+
+      if (!user || !accessToken || !refreshToken) {
+        throw new Error('Phản hồi đăng nhập sau đăng ký không hợp lệ.');
+      }
+
+      try {
+        await signIn(user, accessToken, refreshToken);
+      } catch (storageError: any) {
+        throw new Error(storageError?.message || 'Không thể lưu phiên đăng nhập.');
+      }
+
+      try {
+        router.replace('/home');
+      } catch (navigationError: any) {
+        throw new Error(navigationError?.message || 'Không thể chuyển sang trang chủ.');
+      }
     } catch (err: any) {
-      setError(err?.response?.data?.message || 'Không thể đăng ký lúc này.');
+      setError(
+        err?.response?.data?.message
+        || err?.message
+        || 'Không thể đăng ký lúc này.',
+      );
     } finally {
       setLoading(false);
     }
@@ -55,7 +80,14 @@ export default function RegisterScreen() {
       <Field label="Số điện thoại" keyboardType="phone-pad" value={form.phone} onChangeText={(value) => updateField('phone', value)} />
       <Field label="Email" keyboardType="email-address" autoCapitalize="none" value={form.email} onChangeText={(value) => updateField('email', value)} />
       <Field label="Mật khẩu" secureTextEntry value={form.password} onChangeText={(value) => updateField('password', value)} />
-      <Field label="Ngày sinh (yyyy-mm-dd)" value={form.dob} onChangeText={(value) => updateField('dob', value)} />
+      <Field
+        label="Ngày sinh (DD-MM-YYYY)"
+        value={form.dob}
+        keyboardType="number-pad"
+        placeholder="dd-mm-yyyy"
+        maxLength={10}
+        onChangeText={(value) => updateField('dob', maskDisplayDateInput(value))}
+      />
       <Field label="Địa chỉ" multiline value={form.address} onChangeText={(value) => updateField('address', value)} />
 
       <PrimaryButton label="Hoàn tất đăng ký" onPress={handleRegister} loading={loading} />
