@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../services/AuthContext';
 import { User, Calendar, FileText, Activity, Clock, Printer, Star } from 'lucide-react';
 import { api } from '../../services/api';
@@ -7,6 +7,8 @@ import { formatDateDisplay, getStatusBadge, normalizeDateValue, maskDisplayDateI
 const PatientProfile = () => {
   const { currentPatient, setCurrentPatient } = useAuth();
   const [appointments, setAppointments] = useState([]);
+  const [departments, setDepartments] = useState([]);
+  const [doctors, setDoctors] = useState([]);
   const [printData, setPrintData] = useState(null);
   const [loadingProfile, setLoadingProfile] = useState(() => Boolean(currentPatient?.id));
   const [pageError, setPageError] = useState('');
@@ -17,6 +19,53 @@ const PatientProfile = () => {
 
   const [editProfileModal, setEditProfileModal] = useState(false);
   const [profileData, setProfileData] = useState({ cccd: '', dob: '', gender: '' });
+
+  const getDepartmentName = (deptId) => {
+    if (!deptId) return '---';
+    return departments.find((department) => String(department.id) === String(deptId))?.name || '---';
+  };
+
+  const getDoctorName = (doctorId) => {
+    if (!doctorId) return '---';
+    return doctors.find((doctor) => String(doctor.id) === String(doctorId))?.name || '---';
+  };
+
+  const getAssignedNurseName = (appointment) => {
+    const history = Array.isArray(appointment.history) ? appointment.history : [];
+    const nurseEntry = [...history].reverse().find((item) => item?.action?.includes('Điều dưỡng'));
+    return nurseEntry?.by || '---';
+  };
+
+  const renderCareTeamBlock = ({ departmentName, nurseName, doctorName }) => (
+    <div className="mt-3 flex flex-wrap gap-2">
+      <span className="inline-flex items-center rounded-full bg-blue-50 px-3 py-1 text-[11px] font-bold text-blue-700 border border-blue-100">
+        Khoa: {departmentName}
+      </span>
+      <span className="inline-flex items-center rounded-full bg-teal-50 px-3 py-1 text-[11px] font-bold text-teal-700 border border-teal-100">
+        Điều dưỡng: {nurseName}
+      </span>
+      <span className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-[11px] font-bold text-slate-700 border border-slate-200">
+        Bác sĩ: {doctorName}
+      </span>
+    </div>
+  );
+
+  const refreshProfileData = async (patientId = currentPatient?.id) => {
+    if (!patientId) return;
+
+    const [patientRes, appointmentsRes, departmentsRes, doctorsRes] = await Promise.all([
+      api.getPatientById(patientId, 'patient'),
+      api.getAllAppointments(undefined, undefined, 'patient'),
+      api.getDepartments(),
+      api.getDoctors(),
+    ]);
+
+    setCurrentPatient(patientRes.data.user);
+    setAppointments(appointmentsRes.data);
+    setDepartments(departmentsRes.data);
+    setDoctors(doctorsRes.data);
+    setPageError('');
+  };
 
   const handleOpenEdit = () => {
     setProfileData({ cccd: currentPatient.cccd || '', dob: toDisplayDateValue(currentPatient.dob), gender: currentPatient.gender || '' });
@@ -31,30 +80,21 @@ const PatientProfile = () => {
          dob: toApiDateValue(profileData.dob),
        }, 'patient');
        setCurrentPatient(res.data.user);
+       await refreshProfileData(currentPatient.id);
        setEditProfileModal(false);
     } catch {
        alert("Lỗi cập nhật thông tin.");
     }
   };
 
-  const fetchAppts = () => {
-    if (currentPatient) {
-      api.getAllAppointments(undefined, undefined, 'patient')
-        .then(res => setAppointments(res.data))
-        .catch((err) => {
-          setPageError(err?.response?.data?.message || 'Không tải được danh sách lịch hẹn.');
-        });
-    }
-  }
-
   useEffect(() => {
     let isMounted = true;
 
     if (currentPatient?.id) {
-      api.getPatientById(currentPatient.id, 'patient')
-        .then((res) => {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      refreshProfileData(currentPatient.id)
+        .then(() => {
           if (!isMounted) return;
-          setCurrentPatient(res.data.user);
           setPageError('');
         })
         .catch((err) => {
@@ -69,26 +109,29 @@ const PatientProfile = () => {
     return () => {
       isMounted = false;
     };
-  }, [currentPatient?.id, setCurrentPatient]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPatient?.id]);
 
   useEffect(() => {
-    if (currentPatient) {
-      api.getAllAppointments(undefined, undefined, 'patient')
-        .then((res) => {
-          setAppointments(res.data);
-          setPageError('');
-        })
-        .catch((err) => {
-          setPageError(err?.response?.data?.message || 'Không tải được lịch hẹn của bạn.');
-        });
-    }
-  }, [currentPatient]);
+    if (!currentPatient?.id) return undefined;
+
+    const handleFocusRefresh = () => {
+      refreshProfileData(currentPatient.id).catch((err) => {
+        setPageError(err?.response?.data?.message || 'Không tải được lịch hẹn của bạn.');
+      });
+    };
+
+    window.addEventListener('focus', handleFocusRefresh);
+    return () => window.removeEventListener('focus', handleFocusRefresh);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPatient?.id]);
 
   const handleSubmitRating = async (e) => {
      e.preventDefault();
      if (!ratingModal) return;
      try {
        await api.submitRating({ apptId: ratingModal.id, doctorName: ratingModal.doctor, rating: ratingVal, comment: ratingComment });
+       await refreshProfileData(currentPatient?.id);
        alert("Cảm ơn bạn đã đánh giá!");
        setRatingModal(null);
        setRatingVal(5);
@@ -110,7 +153,7 @@ const PatientProfile = () => {
     if(!window.confirm("Bạn có chắc chắn muốn hủy lịch khám này không?")) return;
     try {
       await api.cancelAppointment(id, { role: 'PATIENT', reason: 'Bệnh nhân tự hủy qua cổng thông tin' }, 'patient');
-      fetchAppts();
+      await refreshProfileData(currentPatient?.id);
       alert("Đã gửi yêu cầu hủy lịch.");
     } catch(err) {
       const msg = err?.response?.data?.message || 'Lỗi khi hủy lịch.';
@@ -172,6 +215,11 @@ const PatientProfile = () => {
                      <div>
                        <div className="text-xs text-blue-600 font-bold mb-1 uppercase tracking-wider">{appt.code}</div>
                        <div className="font-semibold text-slate-800 flex items-center gap-2"><Calendar size={16}/> {formatDateDisplay(appt.date)} <span className="text-slate-300">|</span> <Clock size={16}/> {appt.time}</div>
+                       {renderCareTeamBlock({
+                         departmentName: getDepartmentName(appt.current_department || appt.deptId),
+                         nurseName: getAssignedNurseName(appt),
+                         doctorName: getDoctorName(appt.doctorId),
+                       })}
                      </div>
                       <div>{getStatusBadge(appt.status)}</div>
                       {(appt.status === 'PENDING' || appt.status === 'CONFIRMED') && (
@@ -198,7 +246,13 @@ const PatientProfile = () => {
                    <div className="text-sm font-semibold text-blue-600 mb-1">{formatDateDisplay(history.date)}</div>
                    <div className="font-bold text-slate-800 text-lg mb-2">{history.diagnosis || 'Không có chẩn đoán'}</div>
                    <div className="flex items-center justify-between mb-3">
-                      <div className="text-sm text-slate-600"><span className="text-slate-400">Bác sĩ khám:</span> {history.doctor || '---'}</div>
+                      <div className="text-sm text-slate-600">
+                        {renderCareTeamBlock({
+                          departmentName: getDepartmentName(history.deptId),
+                          nurseName: '---',
+                          doctorName: history.doctor || '---',
+                        })}
+                      </div>
                       <button onClick={()=>setRatingModal(history)} className="text-xs bg-yellow-50 text-yellow-600 hover:bg-yellow-400 hover:text-white px-3 py-1.5 rounded-lg flex items-center gap-1 font-bold border border-yellow-200 hover:border-yellow-400 transition">
                         <Star size={12} fill="currentColor"/> Đánh giá Bác sĩ
                       </button>

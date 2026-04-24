@@ -30,8 +30,15 @@ export interface MedicalHistoryItem {
   date: string;
   diagnosis?: string;
   doctor?: string;
+  deptId?: number;
   prescription?: string;
   notes?: string;
+}
+
+export interface AppointmentHistoryItem {
+  date?: string;
+  action?: string;
+  by?: string;
 }
 
 export interface Patient {
@@ -59,6 +66,8 @@ export interface Appointment {
   status: string;
   symptoms?: string;
   createdAt?: string;
+  current_department?: number | string | null;
+  history?: AppointmentHistoryItem[];
 }
 
 export interface LoginResponse {

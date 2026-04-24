@@ -1,16 +1,19 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useFocusEffect } from 'expo-router';
 
-import { Card, Field, InfoBanner, PrimaryButton, Screen, SectionTitle, SecondaryButton } from '@/components/ui';
+import { Card, ChoiceChip, Field, InfoBanner, PrimaryButton, Screen, SectionTitle, SecondaryButton } from '@/components/ui';
 import { useAuth } from '@/context/AuthContext';
 import { mobileApi } from '@/services/api';
 import { colors, radii, spacing } from '@/theme';
-import type { Appointment, MedicalHistoryItem, Patient } from '@/types';
-import { canCancelAppointment, formatDateDisplay, maskDisplayDateInput, toApiDateValue, toDisplayDateValue } from '@/utils/date';
+import type { Appointment, Department, Doctor, MedicalHistoryItem, Patient } from '@/types';
+import { canCancelAppointment, formatDateDisplay, getAppointmentStatusLabel, maskDisplayDateInput, toApiDateValue, toDisplayDateValue } from '@/utils/date';
 
 export default function ProfileScreen() {
   const { patient, updatePatient, signOut } = useAuth();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [editing, setEditing] = useState(false);
@@ -19,18 +22,68 @@ export default function ProfileScreen() {
   const [ratingValue, setRatingValue] = useState('5');
   const [ratingComment, setRatingComment] = useState('');
 
+  const getDepartmentName = useCallback((deptId?: number | string | null) => {
+    if (!deptId) return '---';
+    return departments.find((department) => String(department.id) === String(deptId))?.name || '---';
+  }, [departments]);
+
+  const getDoctorName = useCallback((doctorId?: number | string | null) => {
+    if (!doctorId) return '---';
+    return doctors.find((doctor) => String(doctor.id) === String(doctorId))?.name || '---';
+  }, [doctors]);
+
+  const getAssignedNurseName = useCallback((appointment: Appointment) => {
+    const history = Array.isArray(appointment.history) ? appointment.history : [];
+    const nurseEntry = [...history].reverse().find((item) => item?.action?.includes('Điều dưỡng'));
+    return nurseEntry?.by || '---';
+  }, []);
+
+  const CareTeamBlock = ({
+    departmentName,
+    nurseName,
+    doctorName,
+  }: {
+    departmentName: string;
+    nurseName: string;
+    doctorName: string;
+  }) => (
+    <View style={styles.careTeamWrap}>
+      <View style={[styles.carePill, styles.departmentPill]}>
+        <Text style={[styles.carePillText, styles.departmentPillText]}>Khoa: {departmentName}</Text>
+      </View>
+      <View style={[styles.carePill, styles.nursePill]}>
+        <Text style={[styles.carePillText, styles.nursePillText]}>Điều dưỡng: {nurseName}</Text>
+      </View>
+      <View style={[styles.carePill, styles.doctorPill]}>
+        <Text style={[styles.carePillText, styles.doctorPillText]}>Bác sĩ: {doctorName}</Text>
+      </View>
+    </View>
+  );
+
+  const refreshProfile = useCallback(async () => {
+    if (!patient?.id) return;
+
+    const [patientRes, appointmentRes, departmentRes, doctorRes] = await Promise.all([
+      mobileApi.getPatientById(patient.id),
+      mobileApi.getPatientAppointments(),
+      mobileApi.getDepartments(),
+      mobileApi.getDoctors(),
+    ]);
+
+    await updatePatient(patientRes.data.user);
+    setAppointments(appointmentRes.data);
+    setDepartments(departmentRes.data);
+    setDoctors(doctorRes.data);
+    setError('');
+  }, [patient?.id, updatePatient]);
+
   useEffect(() => {
     let active = true;
     if (!patient?.id) return;
 
-    Promise.all([
-      mobileApi.getPatientById(patient.id),
-      mobileApi.getPatientAppointments(),
-    ])
-      .then(([patientRes, appointmentRes]) => {
+    refreshProfile()
+      .then(() => {
         if (!active) return;
-        updatePatient(patientRes.data.user);
-        setAppointments(appointmentRes.data);
       })
       .catch((err: any) => {
         if (!active) return;
@@ -43,7 +96,15 @@ export default function ProfileScreen() {
     return () => {
       active = false;
     };
-  }, [patient?.id]);
+  }, [patient?.id, refreshProfile]);
+
+  useFocusEffect(
+    useCallback(() => {
+      refreshProfile().catch((err: any) => {
+        setError(err?.response?.data?.message || 'Không tải được hồ sơ bệnh nhân.');
+      });
+    }, [refreshProfile]),
+  );
 
   const currentPatient = patient as Patient | null;
   const openAppointments = useMemo(() => appointments.filter((item) => !['COMPLETED', 'CANCELED'].includes(item.status)), [appointments]);
@@ -68,6 +129,7 @@ export default function ProfileScreen() {
       };
       const res = await mobileApi.updatePatientProfile(currentPatient.id, payload);
       await updatePatient(res.data.user);
+      await refreshProfile();
       setEditing(false);
     } catch (err: any) {
       Alert.alert('Lỗi', err?.response?.data?.message || 'Không thể cập nhật hồ sơ lúc này.');
@@ -86,8 +148,7 @@ export default function ProfileScreen() {
               role: 'PATIENT',
               reason: 'Bệnh nhân tự hủy qua ứng dụng mobile',
             });
-            const nextAppointments = await mobileApi.getPatientAppointments();
-            setAppointments(nextAppointments.data);
+            await refreshProfile();
           } catch (err: any) {
             Alert.alert('Lỗi', err?.response?.data?.message || 'Không thể hủy lịch lúc này.');
           }
@@ -106,6 +167,7 @@ export default function ProfileScreen() {
         rating: Number(ratingValue),
         comment: ratingComment,
       });
+      await refreshProfile();
       Alert.alert('Thành công', 'Cảm ơn bạn đã đánh giá bác sĩ.');
       setRatingModal(null);
       setRatingValue('5');
@@ -150,7 +212,12 @@ export default function ProfileScreen() {
           <Card key={appointment.id}>
             <Text style={styles.appointmentCode}>{appointment.code}</Text>
             <Text style={styles.meta}>{formatDateDisplay(appointment.date)} · {appointment.time}</Text>
-            <Text style={styles.meta}>Trạng thái: {appointment.status}</Text>
+            <CareTeamBlock
+              departmentName={getDepartmentName(appointment.current_department || appointment.deptId)}
+              nurseName={getAssignedNurseName(appointment)}
+              doctorName={getDoctorName(appointment.doctorId)}
+            />
+            <Text style={styles.meta}>Trạng thái: {getAppointmentStatusLabel(appointment.status)}</Text>
             {['PENDING', 'CONFIRMED'].includes(appointment.status) && (
               canCancelAppointment(appointment.date, appointment.time)
                 ? <SecondaryButton label="Hủy lịch" onPress={() => handleCancel(appointment.id)} />
@@ -168,7 +235,11 @@ export default function ProfileScreen() {
           <Card key={`${item.date}-${index}`}>
             <Text style={styles.appointmentCode}>{formatDateDisplay(item.date)}</Text>
             <Text style={styles.nameSmall}>{item.diagnosis || 'Không có chẩn đoán'}</Text>
-            <Text style={styles.meta}>Bác sĩ: {item.doctor || '---'}</Text>
+            <CareTeamBlock
+              departmentName={getDepartmentName(item.deptId)}
+              nurseName="---"
+              doctorName={item.doctor || '---'}
+            />
             {item.prescription ? <Text style={styles.note}>Toa thuốc: {item.prescription}</Text> : null}
             {item.notes ? <Text style={styles.note}>Lưu ý: {item.notes}</Text> : null}
             <SecondaryButton label="Đánh giá bác sĩ" onPress={() => setRatingModal(item)} />
@@ -189,7 +260,19 @@ export default function ProfileScreen() {
               maxLength={10}
               onChangeText={(value) => setProfileData((prev) => ({ ...prev, dob: maskDisplayDateInput(value) }))}
             />
-            <Field label="Giới tính" value={profileData.gender} onChangeText={(value) => setProfileData((prev) => ({ ...prev, gender: value }))} />
+            <View style={{ gap: 8 }}>
+              <Text style={styles.fieldLabel}>Giới tính</Text>
+              <View style={styles.genderRow}>
+                {['Nam', 'Nữ'].map((gender) => (
+                  <ChoiceChip
+                    key={gender}
+                    label={gender}
+                    selected={profileData.gender === gender}
+                    onPress={() => setProfileData((prev) => ({ ...prev, gender }))}
+                  />
+                ))}
+              </View>
+            </View>
             <View style={{ gap: spacing.sm }}>
               <PrimaryButton label="Lưu thay đổi" onPress={handleUpdateProfile} />
               <SecondaryButton label="Đóng" onPress={() => setEditing(false)} />
@@ -245,5 +328,53 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     backgroundColor: 'rgba(15, 22, 23, 0.28)',
     padding: spacing.lg,
+  },
+  fieldLabel: {
+    color: colors.text,
+    fontWeight: '700',
+    fontSize: 12,
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+  },
+  genderRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  careTeamWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
+  },
+  carePill: {
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderWidth: 1,
+  },
+  carePillText: {
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  departmentPill: {
+    backgroundColor: '#EFF6FF',
+    borderColor: '#DBEAFE',
+  },
+  departmentPillText: {
+    color: '#1D4ED8',
+  },
+  nursePill: {
+    backgroundColor: '#ECFEFF',
+    borderColor: '#BEEBF3',
+  },
+  nursePillText: {
+    color: '#0F766E',
+  },
+  doctorPill: {
+    backgroundColor: '#F8FAFC',
+    borderColor: '#E2E8F0',
+  },
+  doctorPillText: {
+    color: colors.text,
   },
 });

@@ -84,3 +84,20 @@ export const canCancelAppointment = (date?: string, time?: string) => {
   const diffHours = (appointmentDT.getTime() - Date.now()) / (1000 * 60 * 60);
   return diffHours >= 24;
 };
+
+export const getAppointmentStatusLabel = (status?: string | null) => {
+  const labels: Record<string, string> = {
+    PENDING: 'Chờ lễ tân tiếp nhận',
+    CONFIRMED: 'Đã xác nhận lịch',
+    ARRIVED: 'Đã vào khoa chờ điều dưỡng',
+    READY: 'Sẵn sàng cho bác sĩ khám',
+    COMPLETED: 'Hoàn thành',
+    NO_SHOW: 'Vắng mặt',
+    CANCELED: 'Đã hủy',
+    TRANSFER_PENDING: 'Đang chờ khoa tiếp nhận',
+    EMERGENCY: 'Cấp cứu',
+    EMERGENCY_TRANSFER: 'Chuyển khoa cấp cứu',
+  };
+
+  return labels[String(status || '').trim()] || status || '---';
+};

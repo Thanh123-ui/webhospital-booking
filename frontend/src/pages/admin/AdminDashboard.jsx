@@ -92,7 +92,10 @@ const AdminDashboard = () => {
 
   const calcAge = (dob) => {
     if (!dob) return null;
-    const birth = new Date(dob);
+    const normalizedDob = normalizeDateValue(dob);
+    if (!normalizedDob) return null;
+    const birth = new Date(normalizedDob);
+    if (Number.isNaN(birth.getTime())) return null;
     const today = new Date();
     let age = today.getFullYear() - birth.getFullYear();
     const m = today.getMonth() - birth.getMonth();
@@ -826,7 +829,7 @@ const AdminDashboard = () => {
                           </td>
                           <td className="px-6 py-4 font-mono text-xs text-slate-600">{patient.cccd || '---'}</td>
                           <td className="px-6 py-4">
-                            <div className="text-sm">{patient.dob || '--'}</div>
+                            <div className="text-sm">{patient.dob ? formatDateDisplay(patient.dob) : '--'}</div>
                             {patient.dob && <div className="text-xs text-blue-600 font-bold mt-0.5">{calcAge(patient.dob)} tuổi</div>}
                           </td>
                           <td className="px-6 py-4 text-slate-600">{patient.gender || '--'}</td>

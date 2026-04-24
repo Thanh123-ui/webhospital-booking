@@ -248,7 +248,19 @@ export default function BookingScreen() {
               maxLength={10}
               onChangeText={(value) => patchForm({ dob: maskDisplayDateInput(value) })}
             />
-            <FieldInput label="Giới tính" value={form.gender} onChangeText={(value) => patchForm({ gender: value })} />
+            <View style={{ gap: 6 }}>
+              <Text style={styles.label}>Giới tính</Text>
+              <View style={styles.wrap}>
+                {['Nam', 'Nữ'].map((gender) => (
+                  <ChoiceChip
+                    key={gender}
+                    label={gender}
+                    selected={form.gender === gender}
+                    onPress={() => patchForm({ gender })}
+                  />
+                ))}
+              </View>
+            </View>
 
             <Text style={styles.label}>Triệu chứng</Text>
             <TextInput
