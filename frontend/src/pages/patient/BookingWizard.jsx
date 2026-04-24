@@ -423,7 +423,7 @@ const BookingWizard = () => {
                 <div className="bg-white border-2 border-dashed border-blue-200 rounded-2xl p-8 max-w-md mx-auto text-left relative overflow-hidden shadow-sm mb-10">
                   <div className="absolute top-0 left-0 w-full h-2 bg-blue-500"></div>
                   <div className="text-center mb-6">
-                    <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Mã Phiếu Khám</div>
+                    <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Mã lịch hẹn</div>
                     <div className="text-4xl font-black text-blue-600 tracking-widest">{bookedCode}</div>
                   </div>
                 </div>

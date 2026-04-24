@@ -277,7 +277,7 @@ export default function BookingScreen() {
         {step === 4 ? (
           <View style={{ gap: spacing.lg }}>
             <Text style={styles.stepTitle}>Đặt lịch thành công</Text>
-            <InfoBanner tone="success" text={`Mã lịch của bạn là ${bookedCode}. Hãy lưu lại để tra cứu khi cần.`} />
+            <InfoBanner tone="success" text={`Mã lịch hẹn của bạn là ${bookedCode}. Hãy lưu lại để tra cứu khi cần.`} />
             <PrimaryButton label="Xem hồ sơ bệnh nhân" onPress={() => router.push('/profile')} />
             <SecondaryButton label="Đặt lịch mới" onPress={() => {
               setStep(1);
