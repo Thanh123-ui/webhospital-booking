@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 
 import { AvatarBadge, Card, InfoBanner, PrimaryButton, Screen, SectionTitle, SecondaryButton } from '@/components/ui';
@@ -14,6 +14,19 @@ const DEPT_EMOJIS: Record<string, string> = {
   'Nha khoa': '😁',
   'Thần kinh': '🧠',
 };
+
+const HOTLINE_PHONE = '19001234';
+
+const HOME_ACTIONS = [
+  { label: 'Đăng ký khám bệnh', hint: 'Chọn khoa, bác sĩ và khung giờ', icon: '📅', action: 'book' },
+  { label: 'Thông tin khám bệnh', hint: 'Xem quy trình và đi tới đặt lịch', icon: '🩺', action: 'book' },
+  { label: 'Thanh toán viện phí', hint: 'Theo dõi các khoản cần thanh toán', icon: '💳', action: 'payments' },
+  { label: 'Quản lý hồ sơ', hint: 'Cập nhật hồ sơ và lịch hẹn', icon: '👤', action: 'profile' },
+  { label: 'Lịch tái khám', hint: 'Xem các lịch hẹn và ghi chú tái khám', icon: '🔁', action: 'followUps' },
+  { label: 'Hóa đơn điện tử', hint: 'Nhận hóa đơn khi tính năng sẵn sàng', icon: '🧾', action: 'invoice' },
+  { label: 'Hotline', hint: 'Gọi tổng đài 1900 1234', icon: '☎️', action: 'hotline' },
+  { label: 'Tư vấn 24/7', hint: 'Kênh tư vấn trực tuyến', icon: '💬', action: 'consulting' },
+] as const;
 
 export default function HomeScreen() {
   const [departments, setDepartments] = useState<Department[]>([]);
@@ -51,6 +64,33 @@ export default function HomeScreen() {
     .filter((doctor) => doctor.departmentName && !departments.find((department) => department.id === doctor.deptId)?.isEmergency)
     .slice(0, 3), [doctors, departments]);
 
+  const handleActionPress = async (action: typeof HOME_ACTIONS[number]['action']) => {
+    switch (action) {
+      case 'book':
+        router.push('/book');
+        return;
+      case 'payments':
+        router.push('./payments');
+        return;
+      case 'profile':
+        router.push('/profile');
+        return;
+      case 'followUps':
+        router.push('./follow-ups');
+        return;
+      case 'invoice':
+      case 'consulting':
+        Alert.alert('Thông báo', 'Tính năng đang phát triển');
+        return;
+      case 'hotline':
+        try {
+          await Linking.openURL(`tel:${HOTLINE_PHONE}`);
+        } catch {
+          Alert.alert('Không thể gọi hotline', 'Vui lòng gọi 1900 1234 để được hỗ trợ.');
+        }
+    }
+  };
+
   return (
     <Screen>
       <Card style={styles.heroCard}>
@@ -62,13 +102,32 @@ export default function HomeScreen() {
           Bệnh viện Hospital mang đến trải nghiệm y tế hiện đại, nơi mọi lần thăm khám bắt đầu bằng sự an tâm.
         </Text>
         <View style={{ gap: 12 }}>
-          <PrimaryButton label="Đặt lịch ngay" onPress={() => router.push('/book')} />
+          <PrimaryButton label="Đăng ký khám bệnh" onPress={() => router.push('/book')} />
           <SecondaryButton label="Xem hồ sơ bệnh nhân" onPress={() => router.push('/profile')} />
         </View>
       </Card>
 
       {error ? <InfoBanner tone="error" text={error} /> : null}
       {loading ? <InfoBanner text="Đang tải chuyên khoa và bác sĩ..." /> : null}
+
+      <SectionTitle title="Thông tin khám bệnh" subtitle="Các thao tác thường dùng cho bệnh nhân trước và sau khi thăm khám." />
+      <View style={styles.actionGrid}>
+        {HOME_ACTIONS.map((item) => (
+          <Pressable
+            key={item.label}
+            onPress={() => handleActionPress(item.action)}
+            style={({ pressed }) => [styles.actionCard, pressed ? styles.actionCardPressed : null]}
+          >
+            <View style={styles.actionIconWrap}>
+              <Text style={styles.actionIcon}>{item.icon}</Text>
+            </View>
+            <View style={{ flex: 1, gap: 4 }}>
+              <Text style={styles.actionTitle}>{item.label}</Text>
+              <Text style={styles.actionHint}>{item.hint}</Text>
+            </View>
+          </Pressable>
+        ))}
+      </View>
 
       <SectionTitle title="Chuyên khoa nổi bật" subtitle="Chọn nhanh chuyên khoa rồi đi thẳng tới bước đặt lịch trên mobile." />
       <View style={styles.grid}>
@@ -132,6 +191,45 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.md,
+  },
+  actionGrid: {
+    gap: spacing.sm,
+  },
+  actionCard: {
+    minHeight: 78,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderWidth: 1,
+    borderRadius: radii.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+  },
+  actionCardPressed: {
+    opacity: 0.84,
+    transform: [{ scale: 0.99 }],
+  },
+  actionIconWrap: {
+    width: 46,
+    height: 46,
+    borderRadius: 16,
+    backgroundColor: colors.primarySoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actionIcon: {
+    fontSize: 23,
+  },
+  actionTitle: {
+    color: colors.text,
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  actionHint: {
+    color: colors.textMuted,
+    lineHeight: 19,
   },
   deptCard: {
     width: '47%',

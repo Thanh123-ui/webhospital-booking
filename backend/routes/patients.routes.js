@@ -8,6 +8,7 @@ const { validateRequest, validators } = require('../middlewares/validation.middl
 router.post('/register', validateRequest([
   { field: 'name', validate: validators.requiredString('Họ tên') },
   { field: 'phone', validate: validators.requiredString('Số điện thoại') },
+  { field: 'email', validate: validators.requiredString('Email') },
   { field: 'password', validate: validators.requiredString('Mật khẩu') },
 ]), patientsController.registerPatient);
 

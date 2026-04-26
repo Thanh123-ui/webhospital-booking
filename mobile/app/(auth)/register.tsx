@@ -27,6 +27,18 @@ export default function RegisterScreen() {
 
   const handleRegister = async () => {
     setError('');
+    
+    if (!form.name || !form.phone || !form.email || !form.password) {
+      setError('Vui lòng điền đầy đủ họ tên, số điện thoại, email và mật khẩu.');
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(form.email)) {
+      setError('Email không hợp lệ.');
+      return;
+    }
+
     setLoading(true);
 
     try {

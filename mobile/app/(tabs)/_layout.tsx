@@ -52,6 +52,18 @@ export default function TabsLayout() {
           tabBarIcon: ({ color }) => <TabIcon emoji="👤" color={color} />,
         }}
       />
+      <Tabs.Screen
+        name="payments"
+        options={{
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="follow-ups"
+        options={{
+          href: null,
+        }}
+      />
     </Tabs>
   );
 }

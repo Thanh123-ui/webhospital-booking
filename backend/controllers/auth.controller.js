@@ -4,6 +4,8 @@ const bcrypt = require('bcryptjs');
 const { writeLog } = require('../utils/logger');
 const { jwtSecret, jwtRefreshSecret } = require('../config/env');
 const { AppError, sendSuccess, toAppError } = require('../utils/http');
+const emailService = require('../utils/email');
+const env = require('../config/env');
 
 const OTP_TTL_MS = 5 * 60 * 1000;
 const OTP_RESEND_MS = 60 * 1000;
@@ -65,11 +67,25 @@ exports.requestPatientPasswordResetOtp = async (req, res, next) => {
 
         writeLog('Yêu cầu OTP quên mật khẩu bệnh nhân', patient.name);
 
+        if (patient.email) {
+            await emailService.sendMail({
+                to: patient.email,
+                subject: 'Khôi phục mật khẩu - Hệ thống Đặt lịch khám',
+                html: emailService.emailTemplates.otpReset({
+                    name: patient.name,
+                    otp,
+                    expiresInMinutes: OTP_TTL_MS / 60000
+                })
+            }).catch(e => console.error('Lỗi khi gửi mail OTP:', e));
+        }
+
+        const isEthereal = env.emailProvider !== 'ses';
+        
         return sendSuccess(res, {
             phone,
             expiresInSeconds: Math.floor(OTP_TTL_MS / 1000),
-            previewOtp: otp,
-        }, 'Mã OTP đã được tạo. Hiện hệ thống đang ở chế độ test nên mã được trả về để bạn kiểm tra.');
+            ...(isEthereal && { previewOtp: otp }),
+        }, isEthereal ? 'Mã OTP đã được tạo. Hiện hệ thống đang ở chế độ test nên mã được trả về để bạn kiểm tra.' : 'Mã xác thực đã được gửi về email của bạn. Vui lòng kiểm tra hộp thư.');
     } catch (err) {
         next(toAppError(err));
     }

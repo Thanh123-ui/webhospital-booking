@@ -2,6 +2,7 @@ const appointmentService = require('../services/appointments.service');
 const { writeLog } = require('../utils/logger');
 const db = require('../data/db');
 const { AppError, sendSuccess, toAppError } = require('../utils/http');
+const emailService = require('../utils/email');
 
 exports.getAllAppointments = async (req, res, next) => {
     try {
@@ -33,6 +34,34 @@ exports.createAppointment = async (req, res, next) => {
 
         writeLog(`Đặt lịch mới: ${newAppointment.code} — ${newAppointment.patientName}`, user.name || 'Bệnh nhân');
         if (req.io) req.io.emit('new_appointment', newAppointment);
+
+        // Gửi email xác nhận (không block response)
+        (async () => {
+            try {
+                const patient = await db.findPatientById(newAppointment.patientId);
+                if (patient && patient.email) {
+                    const departments = await db.getDepartments();
+                    const staffList = await db.getStaff();
+                    const dept = departments.find(d => d.id === newAppointment.deptId);
+                    const doc = staffList.find(s => s.id === newAppointment.doctorId);
+
+                    await emailService.sendMail({
+                        to: patient.email,
+                        subject: 'Xác nhận đặt lịch khám - Hệ thống Bệnh viện',
+                        html: emailService.emailTemplates.appointmentConfirmed({
+                            name: patient.name,
+                            code: newAppointment.code,
+                            date: newAppointment.date,
+                            time: newAppointment.time,
+                            doctorName: doc ? doc.name : 'Chưa xếp',
+                            deptName: dept ? dept.name : 'Không rõ',
+                        })
+                    });
+                }
+            } catch (err) {
+                console.error('Lỗi khi gửi mail xác nhận đặt lịch:', err);
+            }
+        })();
 
         sendSuccess(res, newAppointment, 'Đặt lịch thành công.', 201);
     } catch (err) {
