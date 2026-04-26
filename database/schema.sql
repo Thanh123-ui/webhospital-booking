@@ -1,0 +1,224 @@
+-- ==============================================================================
+-- BỆNH VIỆN WEB BOOKING - DATABASE SCHEMA & INITIAL DATA
+-- Áp dụng trên database hiện tại mà backend đã kết nối tới
+-- ==============================================================================
+
+-- 1. BẢNG CHUYÊN KHOA
+CREATE TABLE IF NOT EXISTS departments (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  name VARCHAR(100) NOT NULL,
+  `desc` TEXT,
+  iconRef VARCHAR(50),
+  color VARCHAR(30),
+  isEmergency BOOLEAN DEFAULT FALSE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 2. BẢNG NHÂN VIÊN / BÁC SĨ (STAFF)
+CREATE TABLE IF NOT EXISTS staff (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  deptId INT NULL,
+  name VARCHAR(150) NOT NULL,
+  title VARCHAR(150),
+  avatar VARCHAR(10),
+  exp VARCHAR(50),
+  role VARCHAR(50) DEFAULT 'DOCTOR', -- DOCTOR, NURSE, ADMIN, BOD, RECEPTIONIST
+  isActive BOOLEAN DEFAULT TRUE,
+  username VARCHAR(100) UNIQUE NOT NULL,
+  password VARCHAR(255) NOT NULL,    -- Trong thực tế nên đổi thành chuỗi đã băm (hash)
+  FOREIGN KEY (deptId) REFERENCES departments(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 3. BẢNG BỆNH NHÂN
+CREATE TABLE IF NOT EXISTS patients (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  patientCode VARCHAR(20) UNIQUE,
+  cccd VARCHAR(20),
+  name VARCHAR(150) NOT NULL,
+  phone VARCHAR(20) UNIQUE NOT NULL,
+  email VARCHAR(150),
+  password VARCHAR(255) NOT NULL,
+  gender VARCHAR(10),
+  dob DATE,
+  address TEXT,
+  medicalHistory JSON
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 4. BẢNG LỊCH HẸN
+CREATE TABLE IF NOT EXISTS appointments (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  code VARCHAR(20) UNIQUE NOT NULL,
+  patientId INT,
+  patientName VARCHAR(150),
+  phone VARCHAR(20),
+  doctorId INT,
+  deptId INT,
+  `date` DATE,
+  `time` VARCHAR(10),
+  status VARCHAR(50) DEFAULT 'PENDING',
+  symptoms TEXT,
+  is_emergency BOOLEAN DEFAULT FALSE,
+  current_department INT NULL,
+  history JSON,
+  rescheduledAt TIMESTAMP NULL,
+  rescheduledBy INT NULL,
+  rescheduledByName VARCHAR(150) NULL,
+  noShowAt TIMESTAMP NULL,
+  noShowBy INT NULL,
+  noShowByName VARCHAR(150) NULL,
+  noShowReason TEXT NULL,
+  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (patientId) REFERENCES patients(id) ON DELETE SET NULL,
+  FOREIGN KEY (doctorId) REFERENCES staff(id) ON DELETE SET NULL,
+  FOREIGN KEY (deptId) REFERENCES departments(id) ON DELETE SET NULL,
+  FOREIGN KEY (current_department) REFERENCES departments(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 4B. BẢNG YÊU CẦU HỖ TRỢ CẤP CỨU
+CREATE TABLE IF NOT EXISTS emergency_requests (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  code VARCHAR(20) UNIQUE NOT NULL,
+  requesterName VARCHAR(150) NOT NULL,
+  phone VARCHAR(20) NOT NULL,
+  symptoms TEXT NOT NULL,
+  location TEXT,
+  status VARCHAR(50) DEFAULT 'PENDING',
+  history JSON,
+  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  handledAt TIMESTAMP NULL,
+  handledBy INT NULL,
+  handledByName VARCHAR(150) NULL,
+  FOREIGN KEY (handledBy) REFERENCES staff(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 5. BẢNG LỊCH LÀM VIỆC CỦA BÁC SĨ (SCHEDULES)
+CREATE TABLE IF NOT EXISTS schedules (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  doctorId INT NOT NULL,
+  `date` DATE NOT NULL,
+  `time` VARCHAR(10) NOT NULL,
+  maxPatients INT DEFAULT 2,
+  booked INT DEFAULT 0,
+  FOREIGN KEY (doctorId) REFERENCES staff(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 6. BẢNG LỊCH SỬ CHUYỂN KHOA CẤP CỨU
+CREATE TABLE IF NOT EXISTS emergency_transfers (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  appointmentId INT,
+  appointmentCode VARCHAR(20),
+  patientId INT,
+  patientName VARCHAR(150),
+  fromDeptId INT NULL,
+  fromDeptName VARCHAR(100),
+  toDeptId INT,
+  toDeptName VARCHAR(100),
+  reason TEXT,
+  transferredBy INT,
+  transferredByName VARCHAR(150),
+  transferredAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 7. BẢNG ĐÁNH GIÁ BÁC SĨ
+CREATE TABLE IF NOT EXISTS ratings (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  apptId INT NULL,
+  doctorName VARCHAR(150),
+  rating INT NOT NULL,
+  comment TEXT,
+  `date` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 8. BẢNG LƯU LOGS HỆ THỐNG
+CREATE TABLE IF NOT EXISTS logs (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  `date` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  action TEXT NOT NULL,
+  `by` VARCHAR(150)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+-- ==============================================================================
+-- INSERT DỮ LIỆU MẪU BAN ĐẦU (SEED DATA)
+-- ==============================================================================
+
+-- Insert Departments
+INSERT IGNORE INTO departments (id, name, `desc`, iconRef, color, isEmergency) VALUES
+(1, 'Tim mạch',  'Tầm soát, chẩn đoán và điều trị chuyên sâu các bệnh lý tim mạch.', 'HeartPulse', 'red', FALSE),
+(2, 'Nhi khoa',  'Chăm sóc sức khỏe toàn diện cho trẻ sơ sinh, trẻ nhỏ và vị thành niên.', 'Activity', 'blue', FALSE),
+(3, 'Nha khoa',  'Khám, nhổ răng, phục hình thẩm mỹ và chăm sóc răng miệng.', 'Stethoscope', 'teal', FALSE),
+(4, 'Thần kinh', 'Khám và điều trị các bệnh lý về não, tủy sống và dây thần kinh.', 'Brain', 'purple', FALSE),
+(5, 'Cấp cứu',   'Tiếp nhận và xử lý các trường hợp cấp cứu, chuyển viện và phân luồng.', 'Ambulance', 'orange', TRUE);
+
+-- Insert Staff (Báo sĩ, Điều dưỡng, Admin, BOD, Lễ tân)
+INSERT IGNORE INTO staff (id, deptId, name, title, avatar, exp, role, isActive, username, password) VALUES
+(1,  1,    'BS. Trần Văn Tim',   'Tiến sĩ, BS CKI',           '👨‍⚕️', '15 năm', 'DOCTOR',       TRUE,  'bstim',      '$2b$10$iFQLdAeMFTzcs6UorO1X6uRNAOWH.kTwEinPEDFyN6T02XJG8EKWa'),
+(2,  2,    'BS. Nguyễn Thị Bé',  'Thạc sĩ',                   '👩‍⚕️', '10 năm', 'DOCTOR',       TRUE,  'bsbe',       '$2b$10$.Huze4aY7cdEGe4LJRLObOYFdE55Ev.iC/2/JPGq77y8Auoym1pTe'),
+(3,  3,    'BS. Lê Răng Sứ',     'BS Răng Hàm Mặt',           '👨‍⚕️', '8 năm',  'DOCTOR',       TRUE,  'bssu',       '$2b$10$4XysuTOFPK6q5Rw0Z78ptuH9wa0FhxCgf4zs2yETDQvZO/ju/GPZ6'),
+(4,  4,    'BS. Phạm Não',       'PGS. TS. Bác sĩ',           '👨‍⚕️', '20 năm', 'DOCTOR',       TRUE,  'bsnao',      '$2b$10$tzEqLRTEYgVaAXVsaXbEveGCHcpMGVUn00/kPq6OGhGUKzmOUUs86'),
+(11, 5,    'BS. Lê Văn Cấp',     'BS Cấp cứu - Hồi sức',      '🧑‍⚕️', '12 năm', 'DOCTOR',       TRUE,  'bscap',      '$2b$10$YHZ7n4hsRJNbskTrMBclxu9JN.l/7Vte4NDCHkbkRj0cOxaOY2uh2'),
+(13, 1,    'BS. Hoàng Mạch',     'Thạc sĩ',                   '👨‍⚕️', '5 năm',  'DOCTOR',       TRUE,  'bsmach',     '$2b$10$HveWj7BHIAusH5b6js/KMOjs/L0D79I1HgZ4zHI89cuMHdE90xTSO'),
+(14, 2,    'BS. Trương Đồng',    'Bác sĩ Nhi Khoa',           '👩‍⚕️', '7 năm',  'DOCTOR',       TRUE,  'bsdong',     '$2b$10$iEceyJ21UhmNQzgJwR1YU.eWbna0orD.jF1TGz8BT5JEinSMY4sbq'),
+(15, 3,    'BS. Đào Nha',        'BS Răng Hàm Mặt',           '👨‍⚕️', '6 năm',  'DOCTOR',       TRUE,  'bsnha',      '$2b$10$6D.mzt67vqbo1Egqwamym.zsPorMULm11h7qBiCSv7CN7Ftk.3jru'),
+(16, 4,    'BS. Ninh Tủy',       'Tiến sĩ, Bác sĩ',           '👨‍⚕️', '11 năm', 'DOCTOR',       TRUE,  'bstuy',      '$2b$10$IAh7S975e35OFjddpV9reeQDOtS9fWWpHoZvUHr2gQcM5oRmnofDG'),
+(17, 5,    'BS. Đỗ Trọng',       'BS Cấp cứu',                '👨‍⚕️', '9 năm',  'DOCTOR',       TRUE,  'bstrong',    '$2b$10$KDJJMAW8nb4b08bb4J61le8qABLozy5s5IgqTavxsbpreMid8gOLa'),
+(5,  1,    'ĐD. Trần Thị An',    'Điều dưỡng trưởng Tim Mạch','👩‍⚕️', NULL,     'NURSE',        TRUE,  'nurse',      '$2b$10$cn8HAGAghw7p8kJeHkj6ReAkaUcTKGyJcp1LyVKSfkkK0c.G9F9wm'),
+(6,  NULL, 'Nguyễn Văn IT',      'Quản trị hệ thống (IT)',    '🧑‍💻', NULL,     'ADMIN',        TRUE,  'admin',      '$2b$10$Pw7QkXT.nRIQoRFWy.yvduGc2nBthVjI3qQSLnE4Tifr/ZhtTH4Le'),
+(7,  NULL, 'Giám đốc Lê Văn C',  'Tổng Giám Đốc',             '👔', NULL,     'BOD',          TRUE,  'bod',        '$2b$10$cn8HAGAghw7p8kJeHkj6ReAkaUcTKGyJcp1LyVKSfkkK0c.G9F9wm'),
+(8,  NULL, 'Trần Thị Duyên',     'Trưởng bộ phận tiếp đón',   '👩‍💼', NULL,     'RECEPTIONIST', TRUE,  'reception',  '$2b$10$cn8HAGAghw7p8kJeHkj6ReAkaUcTKGyJcp1LyVKSfkkK0c.G9F9wm'),
+(12, 5,    'ĐD. Phạm Thị Nhanh', 'Điều dưỡng Cấp cứu',        '👩‍⚕️', NULL,     'NURSE',        TRUE,  'nursecap',   '$2b$10$NzQT5XErWG5WK9AB9n0Hq.CHzbK4187.M2nSJd38Ymu888uXEDTjW'),
+(9,  1,    'BS. Hoàng Đã Nghỉ',  'Bác sĩ cũ',                 '👨‍⚕️', NULL,     'DOCTOR',       FALSE, 'bsnghi',     '$2b$10$AYP9X5uln6hQitvHkASy2el0y7eAvWg4uTwrhOIzaHVmCkZlgTx.6'),
+(10, 1,    'BS. Nguyễn Văn A',   'Bác sĩ chuyên khoa Mạch',   '👨‍⚕️', NULL,     'DOCTOR',       TRUE,  'nva',        '$2b$10$FG2Irnxho0ca03BeIQbSEODiiIrIPdRWqGZBRepSLa3clBsgUHZ6G');
+
+-- Insert Initial Test Patient
+INSERT IGNORE INTO patients (id, patientCode, cccd, name, phone, email, password, gender, dob, address, medicalHistory) VALUES
+(1, 'BN-10001', '079012345678', 'Nguyễn Văn A', '0901234567', 'nguyenvana@gmail.com', '$2b$10$7uKWp/yXR70tPoI1O0L3W.unOq.LhMauFl9Sx4azhadpbHwKKCFfu', 'Nam', '1980-05-12', 'Quận 1, TP.HCM', '[]'),
+(2, 'BN-10002', '079088888888', 'Trần Thị B', '0988888888', 'tranthib@gmail.com', '$2b$10$OBoqd9d0YUjDKb1xA3.MUeAjvIl.TZnS6/zBDpTvCSc.gH49PO/jq', 'Nữ', '1995-08-20', 'Quận 3, TP.HCM', '[]');
+
+
+-- ==============================================================================
+-- CÁC BẢNG MỞ RỘNG
+-- ==============================================================================
+
+-- 9. BẢNG SINH HIỆU (do Điều dưỡng ghi sau khi bệnh nhân đến khoa)
+CREATE TABLE IF NOT EXISTS vitals (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  appointmentId INT NOT NULL UNIQUE,
+  bloodPressure VARCHAR(20),           -- Huyết áp VD: "120/80"
+  heartRate INT,                       -- Nhịp tim (lần/phút)
+  temperature DECIMAL(4,1),            -- Nhiệt độ (°C)
+  weight DECIMAL(5,1),                 -- Cân nặng (kg)
+  height DECIMAL(5,1),                 -- Chiều cao (cm)
+  spO2 DECIMAL(5,1),                   -- Độ bão hòa oxy (%)
+  notes TEXT,                          -- Ghi chú thêm của điều dưỡng
+  recordedBy INT NULL,                 -- ID điều dưỡng thực hiện đo
+  recordedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (appointmentId) REFERENCES appointments(id) ON DELETE CASCADE,
+  FOREIGN KEY (recordedBy) REFERENCES staff(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 10. BẢNG THÔNG TIN BỆNH VIỆN
+CREATE TABLE IF NOT EXISTS hospital_booking (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  hospitalName VARCHAR(255) NOT NULL DEFAULT 'Hospital',
+  address TEXT,
+  hotline VARCHAR(50),
+  email VARCHAR(150),
+  workingHours VARCHAR(255),
+  updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 11. BẢNG NGƯỜI DÙNG (tách biệt hoàn toàn với bảng staff/admin)
+CREATE TABLE IF NOT EXISTS users (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  username VARCHAR(100) UNIQUE NOT NULL,
+  password VARCHAR(255) NOT NULL,
+  fullName VARCHAR(150),
+  email VARCHAR(150),
+  phone VARCHAR(20),
+  role VARCHAR(50) DEFAULT 'USER',
+  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Seed dữ liệu mặc định cho bảng thông tin bệnh viện
+INSERT IGNORE INTO hospital_booking (id, hospitalName, address, hotline, email, workingHours) VALUES
+(1, 'Bệnh viện Đa khoa Quốc tế Hospital', '123 Nguyễn Văn Linh, Q.7, TP.HCM', '1900 1234', 'info@hospital.vn', 'T2-T7: 07:00 - 20:00 | CN & Lễ: 07:00 - 12:00 | Cấp cứu: 24/7');

@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const LOG_FILE = path.join(__dirname, '../../system-logs.log');
+const LOG_FILE = path.join(__dirname, '../logs/system-logs.log');
 
 const writeLog = (action, user) => {
     const newLog = {

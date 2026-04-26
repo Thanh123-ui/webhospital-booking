@@ -2,7 +2,9 @@ node_modules/
 .env
 dist/
 .gemini/
+# Logs
 system-logs.log
+backend/logs/*.log
 .vscode/
 mobile/.expo/
 mobile/.env
