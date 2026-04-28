@@ -27,8 +27,6 @@ module.exports = {
   awsRegion: process.env.AWS_REGION || '',
   awsSnsSenderId: process.env.AWS_SNS_SENDER_ID || '',
   emailProvider: (process.env.EMAIL_PROVIDER || 'ethereal').toLowerCase(),
-  awsSesRegion: process.env.AWS_SES_REGION || '',
-  awsSesAccessKeyId: process.env.AWS_SES_ACCESS_KEY_ID || '',
-  awsSesSecretAccessKey: process.env.AWS_SES_SECRET_ACCESS_KEY || '',
+  awsSesRegion: process.env.AWS_SES_REGION || process.env.AWS_REGION || 'us-east-1',
   emailFrom: process.env.EMAIL_FROM || '',
 };

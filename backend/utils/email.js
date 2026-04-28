@@ -14,13 +14,9 @@ async function createTransport() {
   const provider = env.emailProvider || 'ethereal';
 
   if (provider === 'ses') {
-    // Sử dụng AWS SES
+    // Sử dụng AWS SES mặc định credential chain (hỗ trợ IAM Role và local AWS_PROFILE)
     const sesClient = new SESClient({
       region: env.awsSesRegion,
-      credentials: {
-        accessKeyId: env.awsSesAccessKeyId,
-        secretAccessKey: env.awsSesSecretAccessKey,
-      },
     });
 
     transporter = nodemailer.createTransport({
