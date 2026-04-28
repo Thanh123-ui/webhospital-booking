@@ -298,7 +298,7 @@ else if (DB_MODE === 'mysql') {
       const path = require('path');
       const fs = require('fs');
       console.log('🔧 [DB] Đang đồng bộ schema từ schema.sql...');
-      const schemaPath = path.join(__dirname, '..', '..', 'schema.sql');
+      const schemaPath = path.join(__dirname, '..', '..', 'database', 'schema.sql');
       const sql = fs.readFileSync(schemaPath, 'utf8');
       await pool.query(sql);
       await ensureAppointmentColumns();
