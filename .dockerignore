@@ -1,0 +1,20 @@
+# Ignore git and environment files
+.git
+.gitignore
+.env
+.env.*
+
+# Ignore node_modules
+node_modules
+backend/node_modules
+frontend/node_modules
+
+# Ignore build artifacts
+dist
+build
+frontend/dist
+
+# Ignore editor and OS files
+.DS_Store
+.vscode
+*.swp

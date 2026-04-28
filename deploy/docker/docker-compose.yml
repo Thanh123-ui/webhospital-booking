@@ -1,0 +1,61 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: hb-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: hospital_booking
+      MYSQL_USER: hospital_user
+      MYSQL_PASSWORD: hospital_password
+    ports:
+      - "3307:3306" # Expose on 3307 to avoid conflict with local MySQL
+    volumes:
+      - db-data:/var/lib/mysql
+      # Mount schema.sql to automatically initialize the database on first run
+      - ../database/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+
+  backend:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/backend.Dockerfile
+    container_name: hb-backend
+    ports:
+      - "5000:5000"
+    environment:
+      - PORT=5000
+      - NODE_ENV=production
+      - DB_MODE=mysql
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_NAME=hospital_booking
+      - DB_USER=hospital_user
+      - DB_PASSWORD=hospital_password
+      # Provide a random secret for testing
+      - JWT_SECRET=test_jwt_secret_12345
+      - JWT_REFRESH_SECRET=test_jwt_refresh_12345
+      - BCRYPT_SALT_ROUNDS=10
+      - CORS_ORIGIN=http://localhost:8080
+      - EMAIL_PROVIDER=ethereal
+    depends_on:
+      mysql:
+        condition: service_healthy
+    restart: on-failure
+
+  frontend:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/frontend.Dockerfile
+    container_name: hb-frontend
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+
+volumes:
+  db-data:
