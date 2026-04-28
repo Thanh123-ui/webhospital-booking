@@ -20,7 +20,7 @@ async function createTransport() {
     });
 
     transporter = nodemailer.createTransport({
-      SES: { ses: sesClient, aws: { SendEmailCommand } }
+      SES: { sesClient, SendEmailCommand }
     });
     console.log('📧 [Email] Đã cấu hình transporter qua AWS SES');
   } else {
