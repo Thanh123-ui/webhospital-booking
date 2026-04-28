@@ -1,5 +1,5 @@
 const nodemailer = require('nodemailer');
-const { SESClient, SendRawEmailCommand } = require('@aws-sdk/client-ses');
+const { SESv2Client, SendEmailCommand } = require('@aws-sdk/client-sesv2');
 const env = require('../config/env');
 
 let transporter = null;
@@ -15,12 +15,12 @@ async function createTransport() {
 
   if (provider === 'ses') {
     // Sử dụng AWS SES mặc định credential chain (hỗ trợ IAM Role và local AWS_PROFILE)
-    const sesClient = new SESClient({
+    const sesClient = new SESv2Client({
       region: env.awsSesRegion,
     });
 
     transporter = nodemailer.createTransport({
-      SES: { ses: sesClient, aws: { SendRawEmailCommand } }
+      SES: { ses: sesClient, aws: { SendEmailCommand } }
     });
     console.log('📧 [Email] Đã cấu hình transporter qua AWS SES');
   } else {
