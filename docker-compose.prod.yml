@@ -1,0 +1,33 @@
+version: '3.8'
+
+# ─────────────────────────────────────────────────────────
+# docker-compose.prod.yml — Môi trường Production (AWS)
+#
+# Khác với docker-compose.yml (dùng cho local dev):
+#   - KHÔNG có service mysql  → Dùng AWS RDS
+#   - Backend đọc credentials từ file backend/.env (được inject bởi Terraform user_data)
+#   - restart: always để tự động khởi động lại nếu container bị crash
+# ─────────────────────────────────────────────────────────
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: deploy/docker/backend.Dockerfile
+    container_name: hb-backend
+    ports:
+      - "5000:5000"
+    env_file:
+      - backend/.env
+    restart: always
+
+  frontend:
+    build:
+      context: .
+      dockerfile: deploy/docker/frontend.Dockerfile
+    container_name: hb-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    restart: always
