@@ -49,11 +49,16 @@ async function createTransport() {
 async function sendMail({ to, subject, html }) {
   try {
     const tp = await createTransport();
+    const fromAddress = env.emailFrom || `"Hospital Booking" <noreply@${env.sesDomain || 'nguyenchithanhit.id.vn'}>`;
+
     const info = await tp.sendMail({
-      from: env.emailFrom || '"Hospital System" <noreply@hospital.local>',
+      from: fromAddress,
+      replyTo: fromAddress,   // Giúp tránh bị Spam
       to,
       subject,
       html,
+      // Plain text fallback — bắt buộc để không bị đánh Spam
+      text: html.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim(),
     });
 
     if (isEthereal) {
